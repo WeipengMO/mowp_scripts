@@ -1,0 +1,6 @@
+[submodule "tools/pyPolyaCaller"]
+	path = tools/pyPolyaCaller
+	url = https://github.com/WeipengMO/pyPolyaCaller.git
+[submodule "pipelines/NGS_RNAseq_pipeline"]
+	path = pipelines/NGS_RNAseq_pipeline
+	url = https://github.com/WeipengMO/NGS_cbRNA_analysis.git
