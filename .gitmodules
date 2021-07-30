@@ -4,3 +4,6 @@
 [submodule "pipelines/NGS_RNAseq_pipeline"]
 	path = pipelines/NGS_RNAseq_pipeline
 	url = https://github.com/WeipengMO/NGS_cbRNA_analysis.git
+[submodule "pipelines/FLEP_seq_pipeline"]
+	path = pipelines/FLEP_seq_pipeline
+	url = https://mirrors.sustech.edu.cn/git/weipengmo/flep_seq_pipeline.git
