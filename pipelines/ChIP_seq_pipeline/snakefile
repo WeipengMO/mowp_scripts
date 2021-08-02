@@ -1,7 +1,7 @@
 '''
 Author       : windz
 Date         : 2020-09-04 14:47:27
-LastEditTime : 2021-08-02 13:03:22
+LastEditTime : 2021-08-02 18:22:32
 Description  :
 '''
 
@@ -86,35 +86,35 @@ plotProfile -m {output.matrix} -out {output.png}
         '''
 
 
-rule macs2_callpeak:
-    input:
-        control=f'aligned_data/{control}.sorted.rmdup.bam',
-        treatment='aligned_data/{treatment}.sorted.rmdup.bam'
-    output:
-        treat='macs2_result/{treatment}_treat_pileup.bdg',
-        control='macs2_result/{treatment}_control_lambda.bdg',
-    threads: 1
-    params:
-        name='{treatment}',
-        out_dir='macs2_result/'
-    shell:
-        '''
-export PATH=/public/home/mowp/miniconda3/envs/py38/bin/:$PATH
-macs2 callpeak -t {input.treatment} -c {input.control} -f BAM -g 119481543 -n {params.name} -B --SPMR -q 0.01 --outdir {params.out_dir}
-        '''
+# rule macs2_callpeak:
+#     input:
+#         control=f'aligned_data/{control}.sorted.rmdup.bam',
+#         treatment='aligned_data/{treatment}.sorted.rmdup.bam'
+#     output:
+#         treat='macs2_result/{treatment}_treat_pileup.bdg',
+#         control='macs2_result/{treatment}_control_lambda.bdg',
+#     threads: 1
+#     params:
+#         name='{treatment}',
+#         out_dir='macs2_result/'
+#     shell:
+#         '''
+# export PATH=/public/home/mowp/miniconda3/envs/py38/bin/:$PATH
+# macs2 callpeak -t {input.treatment} -c {input.control} -f BAM -g 119481543 -n {params.name} -B --SPMR -q 0.01 --outdir {params.out_dir}
+#         '''
 
 
-rule bamCompare:
-    input:
-        control=f'aligned_data/{control}.sorted.rmdup.bam',
-        treatment='aligned_data/{treatment}.sorted.rmdup.bam'
-    output:
-        '{treatment}.compare.bw'
-    threads: 32
-    shell:
-        '''
-bamCompare -b1 {input.treatment} -b2 {input.control} -o {output} --binSize 10 --skipNAs --centerReads --scaleFactorsMethod SES -p {threads}
-        '''
+# rule bamCompare:
+#     input:
+#         control=f'aligned_data/{control}.sorted.rmdup.bam',
+#         treatment='aligned_data/{treatment}.sorted.rmdup.bam'
+#     output:
+#         '{treatment}.compare.bw'
+#     threads: 32
+#     shell:
+#         '''
+# bamCompare -b1 {input.treatment} -b2 {input.control} -o {output} --binSize 10 --skipNAs --centerReads --scaleFactorsMethod SES -p {threads}
+#         '''
 
 # bamCompare \
 #   -b1 aligned_data/col_H3_ChIPseq_GSM4275143.sorted.rmdup.bam \
