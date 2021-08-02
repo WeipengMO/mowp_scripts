@@ -1,0 +1,123 @@
+'''
+Author       : windz
+Date         : 2020-09-04 14:47:27
+LastEditTime : 2021-08-02 12:54:41
+Description  :
+'''
+
+import os
+from glob import glob
+import pandas as pd
+
+
+# create log dir
+if not os.path.exists('log'):
+    os.mkdir('log')
+
+sample_name = []
+with open('raw_data/sample_name.txt', 'r') as f:
+    for line in f:
+        sample_name.append(line.rstrip())
+
+rule all:
+    input:
+        expand('aligned_data/{sample_name}.sorted.rmdup.bam', sample_name=sample_name),
+        expand('bw_files/{sample_name}.sorted.rmdup.CPM.bw', sample_name=sample_name),
+        expand('deeptools_profile/{sample_name}.scale.png', sample_name=sample_name),
+
+
+# paired-end
+rule run_bowtie2:
+    input:
+        fq1='raw_data/{sample_name}_1.fastq.gz',
+        fq2='raw_data/{sample_name}_2.fastq.gz',
+    output:
+        bam=temp('aligned_data/{sample_name}.sorted.bam'),
+        bai=temp('aligned_data/{sample_name}.sorted.bam.bai')
+    params:
+        genome='~/db/Arabidopsis_thaliana/dna/bowtie2_index/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa'
+    threads: 30
+    shell:
+        '''
+bowtie2 -t -p {threads} --dovetail -X 1000 -x {params.genome} -1 {input.fq1} -2 {input.fq2} | samtools sort -@ {threads} -O bam -o {output.bam} -
+samtools index -@ {threads} {output.bam}
+        '''
+
+
+rule MarkDuplicates:
+    input:
+        'aligned_data/{sample_name}.sorted.bam'
+    output:
+        bam='aligned_data/{sample_name}.sorted.rmdup.bam',
+        bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
+    threads: 8
+    shell:
+        '''
+java -jar /public/apps/picard_2.20.2/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
+samtools index -@ 10 {output.bam}
+        '''
+
+
+rule bamCoverage:
+    input:
+        'aligned_data/{sample_name}.sorted.rmdup.bam'
+    output:
+        'bw_files/{sample_name}.sorted.rmdup.CPM.bw'
+    threads: 16
+    shell:
+        '''
+bamCoverage --bam {input} -o {output} --binSize 10 --normalizeUsing RPGC --effectiveGenomeSize 119481543 --skipNonCoveredRegions --numberOfProcessors {threads}
+        '''
+
+
+rule computeMatrix:
+    input:
+        'bw_files/{sample_name}.sorted.rmdup.CPM.bw',
+    output:
+        matrix=temp('deeptools_profile/{sample_name}.matrix.gz'),
+        png='deeptools_profile/{sample_name}.scale.png'
+    params:
+        '/public/home/mowp/db/Arabidopsis_thaliana/isoform/araport11.gene.bed'
+    threads: 16
+    shell:
+        '''
+computeMatrix scale-regions -b 1000 -a 1000 -R {params} -S {input} --skipZeros -o {output.matrix} -p {threads}
+plotProfile -m {output.matrix} -out {output.png}
+        '''
+
+
+rule macs2_callpeak:
+    input:
+        control=f'aligned_data/{control}.sorted.rmdup.bam',
+        treatment='aligned_data/{treatment}.sorted.rmdup.bam'
+    output:
+        treat='macs2_result/{treatment}_treat_pileup.bdg',
+        control='macs2_result/{treatment}_control_lambda.bdg',
+    threads: 1
+    params:
+        name='{treatment}',
+        out_dir='macs2_result/'
+    shell:
+        '''
+export PATH=/public/home/mowp/miniconda3/envs/py38/bin/:$PATH
+macs2 callpeak -t {input.treatment} -c {input.control} -f BAM -g 119481543 -n {params.name} -B --SPMR -q 0.01 --outdir {params.out_dir}
+        '''
+
+
+rule bamCompare:
+    input:
+        control=f'aligned_data/{control}.sorted.rmdup.bam',
+        treatment='aligned_data/{treatment}.sorted.rmdup.bam'
+    output:
+        '{treatment}.compare.bw'
+    threads: 32
+    shell:
+        '''
+bamCompare -b1 {input.treatment} -b2 {input.control} -o {output} --binSize 10 --skipNAs --centerReads --scaleFactorsMethod SES -p {threads}
+        '''
+
+# bamCompare \                                                                                                                                                                    130 ↵
+#   -b1 aligned_data/col_H3_ChIPseq_GSM4275143.sorted.rmdup.bam \
+#   -b2 aligned_data/col_input_ChIPseq_GSM4275149.sorted.rmdup.bam \
+#   -o col_H3_ChIPseq_GSM4275143.compare.bw \
+#   --binSize 10 --skipNAs --centerReads --scaleFactorsMethod SES -p 32
