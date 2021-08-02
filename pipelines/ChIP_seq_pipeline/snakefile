@@ -1,7 +1,7 @@
 '''
 Author       : windz
 Date         : 2020-09-04 14:47:27
-LastEditTime : 2021-08-02 12:54:41
+LastEditTime : 2021-08-02 13:03:22
 Description  :
 '''
 
@@ -116,7 +116,7 @@ rule bamCompare:
 bamCompare -b1 {input.treatment} -b2 {input.control} -o {output} --binSize 10 --skipNAs --centerReads --scaleFactorsMethod SES -p {threads}
         '''
 
-# bamCompare \                                                                                                                                                                    130 ↵
+# bamCompare \
 #   -b1 aligned_data/col_H3_ChIPseq_GSM4275143.sorted.rmdup.bam \
 #   -b2 aligned_data/col_input_ChIPseq_GSM4275149.sorted.rmdup.bam \
 #   -o col_H3_ChIPseq_GSM4275143.compare.bw \
