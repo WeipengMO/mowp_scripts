@@ -3,7 +3,7 @@
 '''
 Date         : 2021-01-22 17:36:35
 LastEditors  : windz
-LastEditTime : 2021-08-04 15:21:15
+LastEditTime : 2021-08-18 16:02:10
 FilePath     : /tools/metaplot/metaplot.py
 '''
 
@@ -63,8 +63,16 @@ def get_target_site(site_type: str, gene_id: str) -> int:
                 return values[1]
             else:
                 return values[2]
+    
+    elif site_type == 'aTSS':
+        # araport11注释的TSS
+        values = gene_model.loc[gene_id, :].values
+        if values[4] == '+':
+            return values[1]
+        else:
+            return values[2]
             
-    elif site_type == 'TES':
+    elif site_type == 'aTES':
         # 获取基因TES
         # array(['1', 3629, 5899, '.', '+'], dtype=object)
         values = gene_model.loc[gene_id, :].values
@@ -76,16 +84,20 @@ def get_target_site(site_type: str, gene_id: str) -> int:
         raise KeyError
 
         
-def get_bw_cov(infile: str, gene_id: str, before: int, after: int):
+def get_bw_cov(
+    infile: str, gene_id: str, before: int, after: int, 
+    site1: str, site2: str
+):
     '''
-    计算sites(加上上下游)区域覆盖度的频数
+    计算前后两个位点加上上下游)区域的覆盖度
+    默认site1为'TTS'，site2为'PAS'
     '''
     chrom, start, end, _, strand = gene_model.loc[gene_id]
     if chrom in {'Pt', 'Mt'}:
         return None
     
-    tss_site = get_target_site('TSS', gene_id)
-    pas_site = get_target_site('PAS', gene_id)
+    tss_site = get_target_site(site1, gene_id)
+    pas_site = get_target_site(site2, gene_id)
 
     bw = pyBigWig.open(infile)
     try:
@@ -105,11 +117,15 @@ def get_bw_cov(infile: str, gene_id: str, before: int, after: int):
         return tss_cov, pas_cov, sum_cov
 
     
-def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64):
+def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS'):
+    '''
+    多基因计算前后两个位点加上上下游)区域的覆盖度
+    默认site1为'TTS'，site2为'PAS'
+    '''
     results = []
     with ProcessPoolExecutor(max_workers=threads) as e:
         chunksize = int(len(gene_list)/threads)
-        results = e.map(get_bw_cov, repeat(infile), gene_list, repeat(before), repeat(after), chunksize=chunksize)
+        results = e.map(get_bw_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), chunksize=chunksize)
     
     tss_cov = np.zeros(before+after)
     pas_cov = np.zeros(before+after)
@@ -128,7 +144,10 @@ def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64):
 # For bam file
 STRAND_TO_BOOL = {'-': True, '+': False}
 
-def get_bam_cov(infile: str, gene_id: str, before: int, after: int):
+def get_bam_cov(
+    infile: str, gene_id: str, before: int, after: int,
+    site1: str, site2: str,
+):
     """
     BAM file for tagged FLEP-seq data
     Ignore splicing junction
@@ -141,7 +160,7 @@ def get_bam_cov(infile: str, gene_id: str, before: int, after: int):
     n = 0
     cov_list = []
     read_set = set()
-    for site_type in ['TSS', 'PAS']:
+    for site_type in [site1, site2]:
         target_site = get_target_site(site_type, gene_id)
         cov = np.zeros(before+after)
 
@@ -190,11 +209,11 @@ def get_bam_cov(infile: str, gene_id: str, before: int, after: int):
         return cov_list[0], cov_list[1], n, gene_id
 
 
-def get_bam_meta_result(infile, gene_list, before=2000, after=2000, threads=64):
+def get_bam_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS'):
     results = []
     with ProcessPoolExecutor(max_workers=threads) as e:
         chunksize = int(len(gene_list)/threads)
-        results = e.map(get_bam_cov, repeat(infile), gene_list, repeat(before), repeat(after), chunksize=chunksize)
+        results = e.map(get_bam_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), chunksize=chunksize)
     
     tss_cov, pas_cov = np.zeros(before+after), np.zeros(before+after)
     n = 0
