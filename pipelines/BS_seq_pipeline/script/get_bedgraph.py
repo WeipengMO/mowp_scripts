@@ -2,9 +2,9 @@
 # coding=utf-8
 '''
 Date         : 2021-08-24 21:05:33
-LastEditTime : 2021-08-24 23:17:50
+LastEditTime : 2021-08-25 13:21:06
 LastEditors  : windz
-FilePath     : /public/home/mowp/test/BS_Seq/script/get_bedgraph.py
+FilePath     : /pipelines/BS_seq_pipeline/script/get_bedgraph.py
 '''
 
 import gzip
@@ -31,7 +31,6 @@ def main(infile: str, output_path: str, chrom_prefix: str):
         'CG': cg_out,
     }
 
-    n = 0
     with gzip.open(infile, 'rt') as f:
         next(f)
         for line in f:
@@ -45,7 +44,7 @@ def main(infile: str, output_path: str, chrom_prefix: str):
             ct_count = float(ct_count)
             c_counts = int(c_counts)
 
-            if ct_count > 0:
+            if ct_count >= 4:
                 ratio = round(c_counts/ct_count, 4)
                 outfile[context].write(f'{chrom}\t{(pos-1)}\t{pos}\t{ratio}\n')
 
