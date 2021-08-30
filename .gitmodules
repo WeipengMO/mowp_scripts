@@ -7,3 +7,6 @@
 [submodule "pipelines/FLEP_seq_pipeline"]
 	path = pipelines/FLEP_seq_pipeline
 	url = https://github.com/WeipengMO/FLEP_seq_pipeline.git
+[submodule "tools/pyIGV"]
+	path = tools/pyIGV
+	url = https://github.com/ZhaiLab-SUSTech/pyIGV.git
