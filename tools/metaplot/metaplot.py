@@ -3,7 +3,7 @@
 '''
 Date         : 2021-01-22 17:36:35
 LastEditors  : windz
-LastEditTime : 2021-08-18 16:02:10
+LastEditTime : 2021-09-02 09:58:01
 FilePath     : /tools/metaplot/metaplot.py
 '''
 
@@ -86,7 +86,7 @@ def get_target_site(site_type: str, gene_id: str) -> int:
         
 def get_bw_cov(
     infile: str, gene_id: str, before: int, after: int, 
-    site1: str, site2: str
+    site1: str, site2: str, chrom_prefix: str
 ):
     '''
     计算前后两个位点加上上下游)区域的覆盖度
@@ -100,6 +100,7 @@ def get_bw_cov(
     pas_site = get_target_site(site2, gene_id)
 
     bw = pyBigWig.open(infile)
+    chrom = chrom_prefix + chrom
     try:
         if strand == '+':
             tss_cov = bw.values(chrom, tss_site-before, tss_site+after)
@@ -117,7 +118,7 @@ def get_bw_cov(
         return tss_cov, pas_cov, sum_cov
 
     
-def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS'):
+def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS', chrom_prefix=''):
     '''
     多基因计算前后两个位点加上上下游)区域的覆盖度
     默认site1为'TTS'，site2为'PAS'
@@ -125,7 +126,7 @@ def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, s
     results = []
     with ProcessPoolExecutor(max_workers=threads) as e:
         chunksize = int(len(gene_list)/threads)
-        results = e.map(get_bw_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), chunksize=chunksize)
+        results = e.map(get_bw_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), repeat(chrom_prefix), chunksize=chunksize)
     
     tss_cov = np.zeros(before+after)
     pas_cov = np.zeros(before+after)
