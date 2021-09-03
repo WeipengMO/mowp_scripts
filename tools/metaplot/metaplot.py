@@ -3,7 +3,7 @@
 '''
 Date         : 2021-01-22 17:36:35
 LastEditors  : windz
-LastEditTime : 2021-09-02 09:58:01
+LastEditTime : 2021-09-02 10:23:31
 FilePath     : /tools/metaplot/metaplot.py
 '''
 
@@ -66,20 +66,26 @@ def get_target_site(site_type: str, gene_id: str) -> int:
     
     elif site_type == 'aTSS':
         # araport11注释的TSS
-        values = gene_model.loc[gene_id, :].values
-        if values[4] == '+':
-            return values[1]
-        else:
-            return values[2]
+        try:
+            values = gene_model.loc[gene_id, :].values
+            if values[4] == '+':
+                return values[1]
+            else:
+                return values[2]
+        except KeyError:
+            return
             
     elif site_type == 'aTES':
         # 获取基因TES
         # array(['1', 3629, 5899, '.', '+'], dtype=object)
-        values = gene_model.loc[gene_id, :].values
-        if values[4] == '+':
-            return values[2]
-        else:
-            return values[1]
+        try:
+            values = gene_model.loc[gene_id, :].values
+            if values[4] == '+':
+                return values[2]
+            else:
+                return values[1]
+        except KeyError:
+            return
     else:
         raise KeyError
 
@@ -92,12 +98,19 @@ def get_bw_cov(
     计算前后两个位点加上上下游)区域的覆盖度
     默认site1为'TTS'，site2为'PAS'
     '''
-    chrom, start, end, _, strand = gene_model.loc[gene_id]
+    try:
+        chrom, start, end, _, strand = gene_model.loc[gene_id]
+    except KeyError:
+        return
+
     if chrom in {'Pt', 'Mt'}:
         return None
     
     tss_site = get_target_site(site1, gene_id)
     pas_site = get_target_site(site2, gene_id)
+
+    if tss_site is None or pas_site is None:
+        return
 
     bw = pyBigWig.open(infile)
     chrom = chrom_prefix + chrom
