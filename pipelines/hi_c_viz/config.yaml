@@ -1,0 +1,6 @@
+ref: "genome_data/TAIR10.chr1.fa"
+fastq1: "/public/home/lizw/task/pore_c/DpnII_hic2/juicer/fastq/SRR1029605.1_R1.fastq"
+fastq2: "/public/home/lizw/task/pore_c/DpnII_hic2/juicer/fastq/SRR1029605.1_R2.fastq"
+MAPQ: 1
+resolution: 50
+MCOOL_RESO: '50, 100, 1000'

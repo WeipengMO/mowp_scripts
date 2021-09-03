@@ -1,0 +1,123 @@
+'''
+Date         : 2021-09-02 18:15:05
+LastEditTime : 2021-09-02 18:35:02
+LastEditors  : windz
+FilePath     : /pipelines/hi_c_viz/snakefile
+'''
+# snakefile for 4DN_project_hic
+# Adapted from Zhuowen
+
+configfile:'config.yaml'
+MAPQ_list=config['MAPQ']
+RESO=config['resolution'] # RESO_set=RESO
+MCOOL_RESO = config['MCOOL_RESO']  # for cooler zoomify 
+
+rule all:
+    input:
+        expand("MAPQ_{MAPQ_filter}_{RESO_set}.mcool",MAPQ_filter=MAPQ_list,RESO_set=RESO),
+
+rule bam:
+    input:
+        ref = config['ref'],
+        fastq1 = config['fastq1'],
+        fastq2 = config['fastq2'],
+    output: 
+        'DpnII_hic.bam'
+    threads: 58 
+    shell:
+        'bwa mem -SP5M -t {threads} {input.ref} {input.fastq1} {input.fastq2} | samtools view -@ {threads} -b > {output}'
+
+rule pair_parse:
+    output:
+        "MAPQ_{MAPQ_filter}.pairsam"
+    input: 
+        bam='DpnII_hic.bam',
+        chromsize = "genome_data/chromosome_size_main"
+    params:
+        MAPQ_value = lambda wildcards: wildcards.MAPQ_filter
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools parse --nproc-in {threads} --nproc-out {threads} --min-mapq {params.MAPQ_value} {input.bam} -c {input.chromsize} >  MAPQ_{params.MAPQ_value}.pairsam
+        """        
+
+rule pair_sort:
+    input:
+        'MAPQ_{MAPQ_filter}.pairsam'
+    output:
+        'sorted_MAPQ_{MAPQ_filter}.pairsam'
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G MAPQ_{params.MAPQ_value}.pairsam -o sorted_MAPQ_{params.MAPQ_value}.pairsam
+        """
+
+
+#this step only keep UU UR RU 
+rule pair_dropdu: 
+    input:
+        'sorted_MAPQ_{MAPQ_filter}.pairsam'
+    output:
+        "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam"
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools dedup --nproc-in {threads} --nproc-out {threads} -o sorted_dropdu_MAPQ_{params.MAPQ_value}.pairsam sorted_MAPQ_{params.MAPQ_value}.pairsam
+        """
+
+rule bgzip:
+    input:
+        "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam"
+    output:
+        "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam.gz"
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter
+    threads: 1
+    shell:
+        "bgzip sorted_dropdu_MAPQ_{params.MAPQ_value}.pairsam"
+
+rule pairix:
+    input:
+        "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam.gz"
+    output:
+        "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam.gz.px2"
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairix/bin:$PATH
+pairix -f -p pairs sorted_dropdu_MAPQ_{params.MAPQ_value}.pairsam.gz
+        """
+
+        
+rule cooler:
+    output:
+        "MAPQ_{MAPQ_filter}_{RESO_set}.cool"
+    input:
+        chromsize = "genome_data/chromosome_size_main",
+        pairsam = "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam.gz",
+        px = "sorted_dropdu_MAPQ_{MAPQ_filter}.pairsam.gz.px2"
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter,
+        reso = lambda wildcard: wildcard.RESO_set
+    threads: 1
+    shell:
+        "cooler cload pairix {input.chromsize}:{params.reso} sorted_dropdu_MAPQ_{params.MAPQ_value}.pairsam.gz MAPQ_{params.MAPQ_value}_{params.reso}.cool"
+
+rule balance:
+    output:
+        "MAPQ_{MAPQ_filter}_{RESO_set}.mcool"
+    input:
+        "MAPQ_{MAPQ_filter}_{RESO_set}.cool"
+    params:
+        MAPQ_value = lambda wildcard: wildcard.MAPQ_filter,
+        reso = lambda wildcard: wildcard.RESO_set
+    shell:
+        "cooler zoomify -r {MCOOL_RESO} --balance --balance-args --convergence-policy=store_nan --balance-args --max-iters=10000 -o MAPQ_{params.MAPQ_value}_{params.reso}.mcool MAPQ_{params.MAPQ_value}_{params.reso}.cool"
