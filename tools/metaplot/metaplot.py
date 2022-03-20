@@ -3,8 +3,8 @@
 '''
 Date         : 2021-01-22 17:36:35
 LastEditors  : windz
-LastEditTime : 2021-09-02 10:23:31
-FilePath     : /tools/metaplot/metaplot.py
+LastEditTime : 2021-11-23 20:58:05
+FilePath     : /atx1_mutant/public/home/mowp/workspace/mowp_scripts/tools/metaplot/metaplot.py
 '''
 
 import numpy as np
@@ -13,6 +13,7 @@ import pyranges as pr
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 import pysam
+import scipy
 
 # 加载画图包
 from matplotlib import pyplot as plt
@@ -153,6 +154,84 @@ def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, s
             sum_cov += 1
             
     return tss_cov, pas_cov, sum_cov
+
+
+def get_bw_scale_cov(infile: str, gene_id: str, site1: str, site2: str,
+                  before: int, after: int, regionbody: int,
+                  chrom_prefix: str):
+
+    chrom, start, end, _, strand = gene_model.loc[gene_id]
+
+
+    if chrom in {'Pt', 'Mt', 'chrM', 'chrC'}:
+        return None
+    chrom = chrom_prefix + chrom
+
+    site1 = get_target_site(site1, gene_id)  # site1
+    site2 = get_target_site(site2, gene_id)  # site1
+
+    bwfile = pyBigWig.open(infile)
+    try:
+        if strand == '+':
+            cov_5 = bwfile.values(chrom, site1 - before, site1)
+            cov_3 = bwfile.values(chrom, site2, site2 + after)
+
+            # gene_body_region
+            cov_gb = bwfile.values(chrom, site1, site2)
+            cov_gb = scipy.ndimage.zoom(cov_gb,
+                                        regionbody / len(cov_gb),
+                                        order=0,
+                                        mode='nearest')
+        else:
+            cov_5 = bwfile.values(chrom, site2 + before, site1)[::-1]
+            cov_3 = bwfile.values(chrom, site2, site2 - after)[::-1]
+
+            # gene_body_region
+            cov_gb = bwfile.values(chrom, site1, site2)[::-1]
+            cov_gb = scipy.ndimage.zoom(cov_gb,
+                                        regionbody / len(cov_gb),
+                                        order=0,
+                                        mode='nearest')
+
+    except RuntimeError:
+        return
+    
+    cov = np.concatenate([cov_5, cov_gb, cov_3])
+
+    return cov, gene_id
+
+
+def get_bw_meta_scale_result(infile,
+                          gene_list,
+                          site1,
+                          site2,
+                          before=1000,
+                          after=1000,
+                          regionbody=1000,
+                          chrom_prefix='',
+                          threads=64):
+    results = []
+    with ProcessPoolExecutor(max_workers=threads) as e:
+        chunksize = int(len(gene_list) / threads)
+        results = e.map(get_bw_scale_cov,
+                        repeat(infile),
+                        gene_list,
+                        repeat(site1),
+                        repeat(site2),
+                        repeat(before),
+                        repeat(after),
+                        repeat(regionbody),
+                        repeat(chrom_prefix),
+                        chunksize=chunksize)
+
+    cov = []
+    for res in results:
+        if res is not None:
+            cov_, gene_id = res
+            cov.append(cov_)
+
+    cov = np.nanmean(cov, axis=0)
+    return cov
 
 
 # For bam file
