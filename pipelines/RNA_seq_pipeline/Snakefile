@@ -1,0 +1,35 @@
+import os
+from glob import glob
+
+configfile: 
+    "config.yml"
+
+workdir:
+    config['workdir']
+
+mode = config['mode']
+
+if mode == 'pe':
+    snakefile = 'rnaseq_pe.smk'
+elif mode == 'se':
+    snakefile = 'rnaseq_se.smk'
+else:
+    raise ValueError('mode must be "pe" or "se"')
+
+include:
+    "snakemake/"+snakefile
+
+include:
+    "snakemake/downstream_analysis.smk"
+
+# create log dir
+if not os.path.exists('log'):
+    os.makedirs('log', exist_ok=True)
+
+sample_name = [os.path.basename(fn.split('_1')[0]) for fn in glob('raw_data/*_1.fastq.gz')]
+
+rule all:
+    input:
+        expand('stringtie/{sample_name}/{sample_name}.gene.gtf', sample_name=sample_name),
+        expand('stringtie/gene_count_matrix.csv', sample_name=sample_name),
+        expand('irratio/{sample_name}.irratio.txt', sample_name=sample_name)

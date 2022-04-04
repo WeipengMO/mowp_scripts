@@ -1,0 +1,10 @@
+# snakemake
+mode: pe
+workdir: .
+
+# genome
+genome: /public/home/mowp/db/Arabidopsis_thaliana/dna/hisat2_index/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa
+ann_gff: /public/home/mowp/db/Arabidopsis_thaliana/gff3/Araport11_GFF3_genes_transposons.201606.gff 
+
+# hisat2
+max_intronlen: 15000
