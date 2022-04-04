@@ -1,0 +1,111 @@
+'''
+Author       : windz
+Date         : 2020-09-04 14:47:27
+LastEditTime : 2022-04-02 18:26:57
+Description  :
+'''
+
+rule run_fastp:
+    input:
+        fq1='raw_data/{sample_name}_1.fastq.gz',
+    output:
+        fq1=temp('raw_data/{sample_name}_R1.clean.fq.gz')
+    params:
+        html='raw_data/{sample_name}.html',
+        json='raw_data/{sample_name}.json'
+    threads: 16
+    shell:
+        '''
+fastp -i {input.fq1} -o {output.fq1} -w {threads} -h {params.html} -j {params.json}
+        '''
+
+
+# paired-end
+rule run_bowtie2_se:
+    input:
+        fq1='raw_data/{sample_name}_R1.clean.fq.gz',
+    output:
+        bam=temp('aligned_data/{sample_name}.sorted.bam'),
+        bai=temp('aligned_data/{sample_name}.sorted.bam.bai')
+    params:
+        genome=config['genome']
+    threads: 30
+    shell:
+        '''
+bowtie2 -t -p {threads} --very-sensitive -x {params.genome} -U {input.fq1} | samtools sort -@ {threads} -O bam -o {output.bam} -
+samtools index -@ {threads} {output.bam}
+        '''
+
+
+rule MarkDuplicates:
+    input:
+        'aligned_data/{sample_name}.sorted.bam'
+    output:
+        bam='aligned_data/{sample_name}.sorted.rmdup.bam',
+        bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
+    threads: 8
+    shell:
+        '''
+java -jar /public/apps/picard_2.20.2/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
+samtools index -@ 10 {output.bam}
+        '''
+
+
+rule bamCoverage:
+    input:
+        'aligned_data/{sample_name}.sorted.rmdup.bam'
+    output:
+        'bw_files/{sample_name}.sorted.rmdup.CPM.bw'
+    threads: 16
+    shell:
+        '''
+bamCoverage --bam {input} -o {output} --binSize 10 --normalizeUsing CPM --skipNonCoveredRegions --numberOfProcessors {threads}
+        '''
+
+
+rule computeMatrix:
+    input:
+        'bw_files/{sample_name}.sorted.rmdup.CPM.bw',
+    output:
+        matrix=temp('deeptools_profile/{sample_name}.matrix.gz'),
+        png='deeptools_profile/{sample_name}.scale.png'
+    params:
+        config['bed']
+    threads: 16
+    shell:
+        '''
+computeMatrix scale-regions -b 1000 -a 1000 -R {params} -S {input} --skipZeros -o {output.matrix} -p {threads}
+plotProfile -m {output.matrix} -out {output.png}
+        '''
+
+
+rule macs2_callpeak:
+    input:
+        treatment='aligned_data/{sample_name}.sorted.rmdup.bam'
+    output:
+        treat='macs2_result/{sample_name}_peaks.narrowPeak',
+    threads: 1
+    params:
+        name='{sample_name}',
+        out_dir='macs2_result/',
+        gsize=config['gsize']
+    shell:
+        '''
+export PATH=/public/home/mowp/anaconda3/envs/container/bin:$PATH
+
+singularity run -B /data:/data ~/test/singularity/macs.sif macs2 callpeak -t {input.treatment} -f BAM -g {params.gsize} -n {params.name} --nomodel --shift -100 --extsize 200 --outdir {params.out_dir}
+        '''
+
+
+rule run_Genrich:
+    input:
+        'aligned_data/{sample_name}.sorted.rmdup.bam'
+    output:
+        bam=temp('aligned_data/{sample_name}.sorted.name.bam'),
+        peak='genrich_result/{sample_name}_peaks.narrowPeak',
+    threads: 1
+    shell:
+        '''
+samtools sort -n -@ 30 -O bam -o {output.bam} {input}
+Genrich -t {output.bam} -o {output.peak} -j  -y  -r  -e Pt,Mt  -v
+        '''

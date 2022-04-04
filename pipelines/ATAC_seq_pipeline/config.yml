@@ -1,0 +1,8 @@
+# snakemake
+mode: pe
+workdir: .
+
+# genome
+genome: /data/Zhaijx/mowp/db/col-CEN/dna/bowtie2_index/Col-CEN_v1.2.fasta 
+bed: /data/Zhaijx/mowp/db/col-CEN/bed/gene.bed
+gsize: 132081078

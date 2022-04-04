@@ -1,0 +1,32 @@
+import os
+from glob import glob
+
+configfile: 
+    "config.yml"
+
+workdir:
+    config['workdir']
+
+mode = config['mode']
+
+if mode == 'pe':
+    snakefile = 'atac_pe.smk'
+else:
+    snakefile = 'atac_se.smk'
+
+include:
+    "snakemake/"+snakefile
+
+# create log dir
+if not os.path.exists('log'):
+    os.makedirs('log', exist_ok=True)
+
+sample_name = [os.path.basename(fn.split('_1')[0]) for fn in glob('raw_data/*_1.fastq.gz')]
+
+rule all:
+    input:
+        expand('aligned_data/{sample_name}.sorted.rmdup.bam', sample_name=sample_name),
+        expand('bw_files/{sample_name}.sorted.rmdup.CPM.bw', sample_name=sample_name),
+        expand('deeptools_profile/{sample_name}.scale.png', sample_name=sample_name),
+        expand('macs2_result/{sample_name}_peaks.narrowPeak', sample_name=sample_name),
+        expand('genrich_result/{sample_name}_peaks.narrowPeak', sample_name=sample_name)
