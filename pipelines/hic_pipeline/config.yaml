@@ -1,0 +1,12 @@
+# genome
+bwa_index: /data/Zhaijx/mowp/db/col-CEN/dna_chr/bwa_index/Col-CEN_chr.fasta
+genomesize: /data/Zhaijx/mowp/db/col-CEN/dna_chr/Col-CEN_chr.sizes
+
+# sample
+sample: ['hindIII_hic_SRR1504819']
+# pairsamtools mapq
+mapq: 1
+# cooler
+resolution: 1000
+# mcool
+mcool_resulation: '1000,2000,5000,10000,25000,50000,100000,250000,500000,1000000,2500000,5000000,10000000'

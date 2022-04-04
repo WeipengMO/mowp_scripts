@@ -1,0 +1,129 @@
+'''
+Date         : 2021-09-02 18:15:05
+LastEditTime : 2021-09-02 18:35:02
+LastEditors  : windz
+Notes        : tell snakemake to allow ambiguity via
+               --allow-ambiguity
+'''
+# snakefile for 4DN_project_hic
+# Adapted from Zhuowen
+
+# create log dir
+if not os.path.exists('log'):
+    os.mkdir('log')
+
+configfile:'config.yaml'
+
+sample=config['sample']
+mapq=config['mapq']
+resolution=config['resolution']
+
+ruleorder: 
+    pair_sort > pair_parse
+
+rule all:
+    input:
+        expand('{SAMPLE}.hic.q{MAPQ}.resolution_{RESOLUTION}.mcool', SAMPLE=sample, MAPQ=mapq, RESOLUTION=resolution)
+
+
+rule run_bwa:
+    input:
+        fastq1='raw_data/{sample}_1.fastq.gz',
+        fastq2='raw_data/{sample}_2.fastq.gz',
+    output: 
+        '{sample}.hic.bam'
+    threads: 58
+    params:
+        ref=config['bwa_index']
+    shell:
+        'bwa mem -SP5M -t {threads} {params.ref} {input.fastq1} {input.fastq2} | samtools view -@ {threads} -b > {output}'
+
+
+rule pair_parse:
+    input: 
+        bam='{sample}.hic.bam',
+    output:
+        temp("{sample}.hic.q{MAPQ}.pairsam")
+    params:
+        genomesize=config['genomesize'],
+        mapq = lambda wildcard: wildcard.MAPQ
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools parse --nproc-in {threads} --nproc-out {threads} --min-mapq {params.mapq} {input.bam} -c {params.genomesize} > {output}
+        """        
+
+
+rule pair_sort:
+    input:
+        '{sample}.hic.q{MAPQ}.pairsam'
+    output:
+        temp('{sample}.hic.q{MAPQ}.sorted.pairsam')
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G --tmpdir ./tmp {input} -o {output}
+        """
+
+
+#this step only keep UU UR RU 
+rule pair_dropdu: 
+    input:
+        '{sample}.hic.q{MAPQ}.sorted.pairsam'
+    output:
+        temp("{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam")
+    threads: 32
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
+pairsamtools dedup --nproc-in {threads} --nproc-out {threads} -o {output} {input}
+        """
+
+
+rule bgzip:
+    input:
+        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam"
+    output:
+        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz"
+    threads: 1
+    shell:
+        "bgzip {input}"
+
+
+rule pairix:
+    input:
+        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz"
+    output:
+        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz.px2"
+    shell:
+        """
+export PATH=/public/home/lizw/anaconda3/envs/pairix/bin:$PATH
+pairix -f -p pairs {input}
+        """
+
+        
+rule cooler:
+    output:
+        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.cool"
+    input:
+        pairsam = "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz",
+        px = "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz.px2"
+    params:
+        chromsize = config['genomesize'],
+        resulation = lambda wildcard: wildcard.RESOLUTION
+    threads: 1
+    shell:
+        "cooler cload pairix {params.chromsize}:{params.resulation} {input.pairsam} {output}"
+
+
+rule balance:
+    output:
+        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.mcool"
+    input:
+        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.cool"
+    params:
+        mcool_resulation = config['mcool_resulation']  # for cooler zoomify 
+    shell:
+        "cooler zoomify -r {params.mcool_resulation} --balance --balance-args --convergence-policy=store_nan --balance-args --max-iters=10000 -o {output} {input}"
