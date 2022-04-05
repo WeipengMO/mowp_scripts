@@ -15,6 +15,10 @@
 | cool | genomic matrix data | HDF5 as the container format |
 | mcool | multi-resolution | There is a special `@` syntax for using these files, which allow you to set the resolution which should be used for this analysis |
 
+## Notes
+
+Run snakemake with `--allow-ambiguity` tag to allow ambiguity.
+
 ## File details
 
 ```

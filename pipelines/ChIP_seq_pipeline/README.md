@@ -24,6 +24,14 @@ The transcription factor ChIP-seq (TF ChIP-seq) pipeline is suitable for protein
 
 To compare the signal between, the [sample_table.tsv](./sample_table.tsv) is required.
 
+Due to issue with MASC2 installation, it is recommended to use singularity to run conda:
+
+You can also pass additional arguments to singularity, including bind points, like this:
+
+`snakemake --use-singularity --singularity-args "-B /path/outside/container/:/path/inside/container/"`
+
+More details, you can see the [Snakemake + docker example, how to use volumes](https://stackoverflow.com/questions/52742698/snakemake-docker-example-how-to-use-volumes)
+
 ## File details
 
 ```

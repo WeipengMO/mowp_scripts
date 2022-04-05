@@ -28,11 +28,11 @@ rule macs2_callpeak:
         name='{treatment}',
         out_dir='macs2_result/',
         gsize=config['gsize']
+    container:
+        "/public/home/mowp/test/singularity/macs.sif"
     shell:
         '''
-export PATH=/public/home/mowp/anaconda3/envs/container/bin:$PATH
-
-singularity run -B /public1:/public1 ~/test/singularity/macs.sif macs2 callpeak -t {input.treatment} -c {input.control} -f BAM -g {params.gsize} -n {params.name} -B --SPMR -q 0.01 --outdir {params.out_dir}
+macs2 callpeak -t {input.treatment} -c {input.control} -f BAM -g {params.gsize} -n {params.name} -B --SPMR -q 0.01 --outdir {params.out_dir}
         '''
 
 rule bamCompare:
