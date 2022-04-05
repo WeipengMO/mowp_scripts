@@ -19,7 +19,7 @@ mapq=config['mapq']
 resolution=config['resolution']
 
 ruleorder: 
-    pair_sort > pair_parse
+    pair_dropdu > pair_sort > pair_parse
 
 rule all:
     input:
@@ -64,7 +64,7 @@ rule pair_sort:
     shell:
         """
 export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
-pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G --tmpdir ./tmp {input} -o {output}
+pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G --tmpdir ./ {input} -o {output}
         """
 
 
