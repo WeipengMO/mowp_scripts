@@ -3,7 +3,7 @@
 '''
 Author       : windz
 Date         : 2022-03-21 10:56:29
-LastEditTime : 2022-03-21 13:31:37
+LastEditTime : 2022-03-23 23:34:33
 LastEditors  : windz
 FilePath     : plot.py
 '''
@@ -12,6 +12,24 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+
+def color_pal(key):
+    '''
+    Custom color palette
+    
+    To preview: 
+        for pal in color_palette.values():
+            sns.palplot(pal) 
+    '''
+
+    color_palette = {
+        'set1': ['#6e9ece', '#e6928f', '#4e9595', '#84574d', '#8d6ab8', '#efdbb9', '#76ba80'], 
+        'set2': ['#46a1cd', '#ce3c35', '#4258a1', '#57b058', '#7b4b99', '#f2df52', '#a9a9a9'],
+        'default': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    }
+
+    return color_palette[key]
 
 
 def plot_scatter_plot(
@@ -98,7 +116,7 @@ def plot_scatter_plot(
     return data, ax
 
 
-def plot_boxplot_with_jitter(
+def boxplot_with_jitter(
     data: list, 
     figsize: tuple = (3, 3), 
     widths = .5, 
@@ -146,7 +164,8 @@ def step_histplot(
     labels = None,
     stat = 'density',
     xlabel = None,
-    figsize=(4, 3)
+    figsize=(4, 3),
+    bbox_to_anchor: tuple = (1, 0, .5, 1)
 ):
     if labels is not None:
         labels = iter(labels)
@@ -164,8 +183,47 @@ def step_histplot(
             label=next(labels)
         )
 
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, bbox_to_anchor=bbox_to_anchor)
     plt.xlabel(xlabel)
     sns.despine(top=True, right=True)
+
+    return ax
+
+
+def read_count_per_gene(
+    gene_counts: dict,
+    bs = .2,
+    max_counts = 3,
+    all_gene_counts = None,
+    ylabel = 'Gene counts',
+    ):
+    if all_gene_counts is None:
+        # 如果没有给出基因总数，则默认注释文件里面的基因总数
+        from utils.get_overlap_genes import _, total_gene_counts
+        all_gene_counts = total_gene_counts
+
+    df = pd.DataFrame(gene_counts.items(), columns=['gene_id', 'counts'])
+    read_count_per_gene = list(np.log10(df['counts']+1))
+    gene_with_null_read = all_gene_counts-len(df)  # 在文库中没有被测到的基因总数
+    read_count_per_gene.extend([0]*gene_with_null_read)
+    read_count_per_gene = np.array(read_count_per_gene)
+
+    counts = read_count_per_gene
+
+    i = 0
+    x, y = [], []
+    while i <= max_counts:
+        mask = (counts <= i) & (counts > i-bs)
+        y.append(len(counts[mask]))
+        x.append(i)
+        i += bs
+
+    plt.figure(figsize=(4, 3))
+    plt.bar(x, y, width=bs)
+    plt.xlabel('$\log_{10}\mathrm{(read\ counts + 1)}$')
+    plt.ylabel(ylabel)
+    sns.despine(top=True, right=True)
+
+    ax = plt.gca()
 
     return ax
