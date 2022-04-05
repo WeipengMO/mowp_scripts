@@ -1,0 +1,16 @@
+# sample setting
+split_num: 12
+sample: 20210728_atx1_seedling
+
+# genome
+genome: /scem/work/mowp/db/Arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa
+
+# mapping
+mm2thread: 36
+
+# guppy
+fast5_path: fast5
+model: dna_r9.4.1_450bps_hac.cfg
+cuda: '"cuda:all:100%"'
+fast5_dir: guppy_out/workspace
+sequencing_summary: sequencing_summary.txt
