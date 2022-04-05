@@ -19,6 +19,10 @@
 
 Run snakemake with `--allow-ambiguity` tag to allow ambiguity.
 
+Pairsamtools was renamed and this repo exists for legacy purposes. Please migrate to the [pairtools](https://github.com/mirnylab/pairtools) project. 
+
+- [ ] 后续把snakefile中的软件更新为`pairtools`
+
 ## File details
 
 ```

@@ -1,0 +1,7 @@
+minimap2
+pysam
+click
+ont-fast5-api
+joblib
+r-tidyverse
+r-optparse 

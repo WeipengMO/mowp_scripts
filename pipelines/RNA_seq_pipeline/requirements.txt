@@ -1,0 +1,6 @@
+fastp
+hisat2
+stringtie
+click
+pysam
+bioconductor-ballgown
