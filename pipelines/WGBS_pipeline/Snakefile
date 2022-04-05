@@ -1,0 +1,38 @@
+import os
+from glob import glob
+
+configfile: 
+    "config.yml"
+
+workdir:
+    config['workdir']
+
+mode = config['mode']
+if mode == 'pe':
+    snakefile = 'bsmapz_pe.smk'
+elif mode == 'se':
+    snakefile = 'bsmapz_se.smk'
+else:
+    raise ValueError('mode not supported')
+
+include:
+    'snakemake/'+snakefile
+
+include:
+    'snakemake/methylation_ratio.smk'
+
+# create log dir
+if not os.path.exists('log'):
+    os.makedirs('log', exist_ok=True)
+
+if config['sample']:
+    sample = config['sample']
+else:
+    sample = [os.path.basename(fn).split('.fastq')[0] for fn in glob('raw_data/*.gz')]
+meth_type = ['cg','chg','chh']
+
+rule all:
+    input:
+        expand('aligned_data/{sample}.bam', sample=sample),
+        expand('methratio/{sample}_methratio.txt.gz', sample=sample),
+        expand('bw_files/{sample}.methratio.{meth_type}.bw', sample=sample, meth_type=meth_type),
