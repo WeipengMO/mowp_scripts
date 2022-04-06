@@ -1,0 +1,7 @@
+cluster: "pbs.py"
+cluster-status: "pbs-status.py"
+jobs: 50
+verbose: False
+output-wait: 10
+quiet: True
+printshellcmds: True
