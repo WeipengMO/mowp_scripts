@@ -3,277 +3,572 @@
 '''
 Date         : 2021-01-22 17:36:35
 LastEditors  : windz
-LastEditTime : 2021-11-23 20:58:05
-FilePath     : /atx1_mutant/public/home/mowp/workspace/mowp_scripts/tools/metaplot/metaplot.py
+LastEditTime : 2022-04-10 15:22:06
+FilePath     : metaplot.py
 '''
 
 import numpy as np
 import pyBigWig
-import pyranges as pr
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 import pysam
 import scipy
 
-# 加载画图包
-from matplotlib import pyplot as plt
 
-
-# get last pa sites
-# get single polya site gene
-last_pa_bed = '/public/home/mowp/workspace/termination/cbRNA_pool/polya_sites/cbRNA.last_polya_cluster_summit.bed'
-last_pa = pr.read_bed(last_pa_bed, as_df=True)
-last_pa.columns = ['Chromosome', 'Start', 'End', 'Name', 'Score', 'Strand', 'ratio']
-last_pa.loc[:, 'Chromosome'] = last_pa.loc[:, 'Chromosome'].astype('str')
-
-mask = last_pa.loc[:, 'Name'].str.contains('_1')
-single_pa_site_gene = last_pa[mask].loc[:, 'Name'].map(lambda x: x.split('_')[0])
-
-last_pa['Name'] = last_pa['Name'].map(lambda x: x.split('_')[0])
-last_pa = last_pa.set_index(['Name'])
-
-
-# get gene model
-gene_model_bed = '/public/home/mowp/db/Arabidopsis_thaliana/isoform/araport11.gene.bed'
-gene_model = pr.read_bed(gene_model_bed, as_df=True)
-gene_model = gene_model.set_index(['Name'])
-
-
-# load TSS
-tss_bed = '/public/home/mowp/data/public_data/epigentics_data/cage_seq_2020/major_TSS.bed'
-tss_bed = pr.read_bed(tss_bed, as_df=True)
-tss_bed = tss_bed.set_index(['Name'])
-
-# For bw file
-def get_target_site(site_type: str, gene_id: str) -> int:
-    if site_type == 'PAS':
-        # 获取基因PAS
-        return last_pa.at[gene_id, 'End']
-    elif site_type == 'TSS':
-        # 获取基因TSS
-        # array(['1', 3629, 5899, '.', '+'], dtype=object)
-        try:
-            values = tss_bed.loc[gene_id, :].values
-            if values[4] == '+':
-                return values[1]
-            else:
-                return values[2]
-        except KeyError:
-            values = gene_model.loc[gene_id, :].values
-            if values[4] == '+':
-                return values[1]
-            else:
-                return values[2]
+def get_bin_cov(data: list, bins: int):
+    data = np.array(data)
+    data = np.nan_to_num(data)
     
-    elif site_type == 'aTSS':
-        # araport11注释的TSS
-        try:
-            values = gene_model.loc[gene_id, :].values
-            if values[4] == '+':
-                return values[1]
-            else:
-                return values[2]
-        except KeyError:
-            return
-            
-    elif site_type == 'aTES':
-        # 获取基因TES
-        # array(['1', 3629, 5899, '.', '+'], dtype=object)
-        try:
-            values = gene_model.loc[gene_id, :].values
-            if values[4] == '+':
-                return values[2]
-            else:
-                return values[1]
-        except KeyError:
-            return
-    else:
-        raise KeyError
+    if bins == 1:
+        return data
+    if bins < 1:
+        raise ValueError('bins must be greater than 1')
 
+    results = []
+    for i in range(0, len(data), bins):
+        bin_data = data[i:i + bins]
+        mean_bin_data = np.nanmean(bin_data)
+        results.append(mean_bin_data)
+
+    return results
+
+
+################
+# For bw file  #
+################
+
+# site-point
+def bw_site_cov(
+    infile: str, 
+    chrom: str, site: int, strand: str,
+    before: int = 1000, after : int = 1000,
+    bins: int = 100,
+    chrom_prefix: str = '',
+    exclude_chr = None
+    ):
+    '''
+    Args:
+        infile: path to bigWig file
+        chrom: chromosome name
+        site: target site
+        strand: '+' or '-'
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of given regions
+    '''
+    site = int(site)
+    chrom = str(chrom)
+
+    if exclude_chr is not None and chrom in exclude_chr:
+        return
+    chrom = chrom_prefix + chrom
         
-def get_bw_cov(
-    infile: str, gene_id: str, before: int, after: int, 
-    site1: str, site2: str, chrom_prefix: str
-):
-    '''
-    计算前后两个位点加上上下游)区域的覆盖度
-    默认site1为'TTS'，site2为'PAS'
-    '''
-    try:
-        chrom, start, end, _, strand = gene_model.loc[gene_id]
-    except KeyError:
-        return
-
-    if chrom in {'Pt', 'Mt'}:
-        return None
-    
-    tss_site = get_target_site(site1, gene_id)
-    pas_site = get_target_site(site2, gene_id)
-
-    if tss_site is None or pas_site is None:
-        return
-
-    bw = pyBigWig.open(infile)
-    chrom = chrom_prefix + chrom
-    try:
-        if strand == '+':
-            tss_cov = bw.values(chrom, tss_site-before, tss_site+after)
-            pas_cov = bw.values(chrom, pas_site-before, pas_site+after)
-        else:
-            tss_cov = bw.values(chrom, tss_site-after, tss_site+before)[::-1]
-            pas_cov = bw.values(chrom, pas_site-after, pas_site+before)[::-1]
-    except RuntimeError:
-        return
-    
-    tss_cov = np.nan_to_num(tss_cov)
-    pas_cov = np.nan_to_num(pas_cov)
-    sum_cov = sum(tss_cov)+sum(pas_cov)
-    if sum_cov > 0:
-        return tss_cov, pas_cov, sum_cov
-
-    
-def get_bw_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS', chrom_prefix=''):
-    '''
-    多基因计算前后两个位点加上上下游)区域的覆盖度
-    默认site1为'TTS'，site2为'PAS'
-    '''
-    results = []
-    with ProcessPoolExecutor(max_workers=threads) as e:
-        chunksize = int(len(gene_list)/threads)
-        results = e.map(get_bw_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), repeat(chrom_prefix), chunksize=chunksize)
-    
-    tss_cov = np.zeros(before+after)
-    pas_cov = np.zeros(before+after)
-    sum_cov = 0
-
-    for res in results:
-        if res is not None:
-            tss_cov += res[0]
-            pas_cov += res[1]
-            #sum_cov += res[2]
-            sum_cov += 1
-            
-    return tss_cov, pas_cov, sum_cov
-
-
-def get_bw_scale_cov(infile: str, gene_id: str, site1: str, site2: str,
-                  before: int, after: int, regionbody: int,
-                  chrom_prefix: str):
-
-    chrom, start, end, _, strand = gene_model.loc[gene_id]
-
-
-    if chrom in {'Pt', 'Mt', 'chrM', 'chrC'}:
-        return None
-    chrom = chrom_prefix + chrom
-
-    site1 = get_target_site(site1, gene_id)  # site1
-    site2 = get_target_site(site2, gene_id)  # site1
-
     bwfile = pyBigWig.open(infile)
-    try:
-        if strand == '+':
-            cov_5 = bwfile.values(chrom, site1 - before, site1)
-            cov_3 = bwfile.values(chrom, site2, site2 + after)
-
-            # gene_body_region
-            cov_gb = bwfile.values(chrom, site1, site2)
-            cov_gb = scipy.ndimage.zoom(cov_gb,
-                                        regionbody / len(cov_gb),
-                                        order=0,
-                                        mode='nearest')
-        else:
-            cov_5 = bwfile.values(chrom, site2 + before, site1)[::-1]
-            cov_3 = bwfile.values(chrom, site2, site2 - after)[::-1]
-
-            # gene_body_region
-            cov_gb = bwfile.values(chrom, site1, site2)[::-1]
-            cov_gb = scipy.ndimage.zoom(cov_gb,
-                                        regionbody / len(cov_gb),
-                                        order=0,
-                                        mode='nearest')
-
-    except RuntimeError:
+    if strand == '+':
+        start = site - before
+        end = site + after
+    else:
+        start = site - after
+        end = site + before
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        # remove Invalid interval
         return
+
+    if strand == '+':
+        values = bwfile.values(
+            chrom, 
+            start,
+            end)
+        cov = get_bin_cov(values, bins)
+
+    elif strand == '-':
+        values = bwfile.values(
+            chrom, 
+            start,
+            end)[::-1]
+        cov = get_bin_cov(values, bins)
+    else:
+        return ValueError('strand must be "+" or "-"')
     
-    cov = np.concatenate([cov_5, cov_gb, cov_3])
+    cov = np.nan_to_num(cov)
+    if sum(cov) > 0:
+        cov = cov / sum(cov)  # density
+        return cov
 
-    return cov, gene_id
+    
+def bw_reference_point(
+    infile: str, 
+    site_info: list,
+    before: int = 1000, after : int = 1000,
+    bins: int = 100,
+    chrom_prefix: str = '',
+    exclude_chr = None,
+    threads=64):
+    '''
+    Reference-point refers to a position within a BED region (e.g., the starting point). In this mode, only those genomicpositions before (upstream) and/or after (downstream) of the reference point will be used.
 
-
-def get_bw_meta_scale_result(infile,
-                          gene_list,
-                          site1,
-                          site2,
-                          before=1000,
-                          after=1000,
-                          regionbody=1000,
-                          chrom_prefix='',
-                          threads=64):
-    results = []
+    Args:
+        infile: path to bigWig file
+        site_info: [(chrom, site1, site2, strand), ...]
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    chrom = site_info[:, 0]
+    site = site_info[:, 1]
+    strand = site_info[:, 2]
     with ProcessPoolExecutor(max_workers=threads) as e:
-        chunksize = int(len(gene_list) / threads)
-        results = e.map(get_bw_scale_cov,
-                        repeat(infile),
-                        gene_list,
-                        repeat(site1),
-                        repeat(site2),
-                        repeat(before),
-                        repeat(after),
-                        repeat(regionbody),
-                        repeat(chrom_prefix),
-                        chunksize=chunksize)
+        chunksize = int(len(site_info) / threads)
+        results = e.map(
+            bw_site_cov,
+            repeat(infile),
+            chrom,
+            site,
+            strand,
+            repeat(before),
+            repeat(after),
+            repeat(bins),
+            repeat(chrom_prefix),
+            repeat(exclude_chr),
+            chunksize=chunksize)
 
     cov = []
-    for res in results:
-        if res is not None:
-            cov_, gene_id = res
+    for cov_ in results:
+        if cov_ is not None:
             cov.append(cov_)
 
-    cov = np.nanmean(cov, axis=0)
+    cov = np.nanmean(cov, axis=0) / bins
     return cov
 
 
-# For bam file
-STRAND_TO_BOOL = {'-': True, '+': False}
+# scale region
+def bw_scale_cov(
+    infile: str, 
+    chrom: str, site1: int, site2: int, strand: str,
+    before: int = 1000, after : int = 1000, regionbody : int = 1000, 
+    bins: int = 100,
+    split: bool = False,
+    chrom_prefix: str = '',
+    exclude_chr = None
+    ):
+    '''
+    Args:
+        infile: path to bigWig file
+        chrom: chromosome name
+        site1: 5' site
+        site2: 3' site
+        strand: '+' or '-'
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    site1 = int(site1)
+    site2 = int(site2)
+    chrom = str(chrom)
 
-def get_bam_cov(
-    infile: str, gene_id: str, before: int, after: int,
-    site1: str, site2: str,
+    if exclude_chr is not None and chrom in exclude_chr:
+        return
+
+    chrom = chrom_prefix + chrom
+
+    bwfile = pyBigWig.open(infile)
+    if strand == '+':
+        start = site1 - before
+        end = site2 + after
+    else:
+        start = site1 - after
+        end = site2 + before
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        # remove Invalid interval
+        return
+
+    if split:
+        # in this mode, regionbody is ignored
+        if strand == '+':
+            cov_5 = bwfile.values(chrom, site1 - before, site1 + after)
+            cov_5 = get_bin_cov(cov_5, bins)
+            cov_3 = bwfile.values(chrom, site2 - before, site2 + after)
+            cov_3 = get_bin_cov(cov_3, bins)
+
+        elif strand == '-':
+            cov_5 = bwfile.values(chrom, site2 - after, site2 + before)[::-1]
+            cov_5 = get_bin_cov(cov_5, bins)
+            cov_3 = bwfile.values(chrom, site1 - after, site1 + before)[::-1]
+            cov_3 = get_bin_cov(cov_3, bins)
+        
+        cov_5 = np.nan_to_num(cov_5)
+        cov_3 = np.nan_to_num(cov_3)
+
+        sum_cov = sum(cov_5)+sum(cov_3)
+        if sum_cov > 0:
+            # density
+            cov_5 = cov_5 / sum_cov
+            cov_3 = cov_3 / sum_cov
+            return cov_5, cov_3
+
+    else:
+        if strand == '+':
+            start = site1 - before
+            end = site2 + after
+        else:
+            start = site1 - after
+            end = site2 + before
+        
+        if start < 0 or end > bwfile.chroms()[chrom]:
+            return
+
+        if strand == '+':
+            cov_5 = bwfile.values(chrom, start, site1)
+            cov_5 = get_bin_cov(cov_5, bins)
+            cov_3 = bwfile.values(chrom, site2, end)
+            cov_3 = get_bin_cov(cov_3, bins)
+            # gene_body_region
+            cov_gb = bwfile.values(chrom, site1, site2)
+            cov_gb = scipy.ndimage.zoom(
+                cov_gb,
+                regionbody / len(cov_gb),
+                order=0,
+                mode='nearest')
+            cov_gb = get_bin_cov(cov_gb, bins)
+
+        elif strand == '-':
+            cov_5 = bwfile.values(chrom, site2, end)[::-1]
+            cov_5 = get_bin_cov(cov_5, bins)
+            cov_3 = bwfile.values(chrom, start, site1)[::-1]
+            cov_3 = get_bin_cov(cov_3, bins)
+            # gene_body_region
+            cov_gb = bwfile.values(chrom, site1, site2)[::-1]
+            cov_gb = scipy.ndimage.zoom(
+                cov_gb,
+                regionbody / len(cov_gb),
+                order=0,
+                mode='nearest')
+            cov_gb = get_bin_cov(cov_gb, bins)
+        else:
+            raise ValueError('strand must be "-" or "+"')
+
+        cov = np.concatenate([cov_5, cov_gb, cov_3])
+        cov = np.nan_to_num(cov)
+
+        if sum(cov) > 0:
+            cov = cov / sum(cov)  # density
+            return cov
+
+
+def bw_scale_regions(
+    infile: str, 
+    site_info: list,
+    before: int = 1000, after : int = 1000, regionbody : int = 1000, 
+    bins: int = 100,
+    split: bool = False,
+    chrom_prefix: str = '',
+    exclude_chr = None,
+    threads=64):
+    '''
+    In the scale-regions mode, all regions in the BED file are stretched or shrunken to the length (in bases) indicated by the user.
+
+    Args:
+        infile: path to bigWig file
+        site_info: [(chrom, site1, site2, strand), ...]
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    site_info = np.array(site_info)
+    chrom = site_info[:, 0]
+    site1 = site_info[:, 1]
+    site2 = site_info[:, 2]
+    strand = site_info[:, 3]
+
+    with ProcessPoolExecutor(max_workers=threads) as e:
+        chunksize = int(len(site_info) / threads)
+        results = e.map(
+            bw_scale_cov,
+            repeat(infile),
+            chrom,
+            site1,
+            site2,
+            strand,
+            repeat(before),
+            repeat(after),
+            repeat(regionbody),
+            repeat(bins),
+            repeat(split),
+            repeat(chrom_prefix),
+            repeat(exclude_chr),
+            chunksize=chunksize)
+
+    if split:
+        cov_5, cov_3 = [], []
+        for res in results:
+            if res is not None:
+                cov_5_, cov_3_ = res
+                cov_5.append(cov_5_)
+                cov_3.append(cov_3_)
+
+        cov_5 = np.nanmean(cov_5, axis=0) / bins
+        cov_3 = np.nanmean(cov_3, axis=0) / bins
+
+        return cov_5, cov_3
+
+    else:
+        cov = []
+        for cov_ in results:
+            if cov_ is not None:
+                cov.append(cov_)
+
+        cov = np.nanmean(cov, axis=0) / bins
+        return cov
+
+
+################
+# For bam file #
+################
+
+# site-point
+def bam_site_cov(
+    infile: str, 
+    chrom: str, site: int, strand: str, gene_id: str,
+    before: int = 1000, after : int = 1000,
+    bins: int = 100,
+    min_counts: int = 1,
+    chrom_prefix: str = '',
+    exclude_chr: set = None,
+    return_raw: bool = False,
 ):
     """
     BAM file for tagged FLEP-seq data
     Ignore splicing junction
+
+    Args:
+        infile: path to bigWig file
+        chrom: chromosome name
+        site: target site
+        strand: '+' or '-'
+        gene_id: gene id
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        min_counts: minimum number of the reads within given region
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of given region
     """
-    chrom, *_, strand = gene_model.loc[gene_id]
-    strand_boo = STRAND_TO_BOOL[strand]
-    if chrom in {'Pt', 'Mt'}:
-        return None
+    site = int(site)
+    chrom = str(chrom)
+    strand_is_reverse = False if strand == '+' else True
+
+    if exclude_chr is not None and chrom in exclude_chr:
+        return
+    chrom = chrom_prefix + chrom
     
     n = 0
-    cov_list = []
-    read_set = set()
-    for site_type in [site1, site2]:
-        target_site = get_target_site(site_type, gene_id)
-        cov = np.zeros(before+after)
 
-        if strand == '+':
-            start = target_site-before
-            end = target_site+after
-        else:
-            start = target_site-after
-            end = target_site+before
-        
-        if start <= 0:
+    cov = np.zeros(before+after)
+
+    if strand == '+':
+        start = site-before
+        end = site+after
+    else:
+        start = site-after
+        end = site+before
+    
+
+    with pysam.AlignmentFile(infile, 'rb') as inbam:
+        if start < 0 or end > inbam.get_reference_length(chrom):
             return
+            
+        for read in inbam.fetch(chrom, start, end):
+            # 判断是否跟基因是同个方向，针对于链特异文库
+            if read.is_reverse != strand_is_reverse:
+                continue
+            
+            read_gene_id = read.get_tag('gi')
+            if read_gene_id not in {gene_id, 'None'}:
+                continue
+                
+            if strand == '+':
+                read_five_end = read.reference_start
+                read_three_end = read.reference_end
+                cov_start = read_five_end-start if read_five_end-start >= 0 else 0
+                cov_end = read_three_end-start if read_three_end-start <= before+after else end-start
+            else:
+                read_five_end = read.reference_end
+                read_three_end = read.reference_start
+                cov_start = end-read_five_end if end-read_five_end >= 0 else 0
+                cov_end = end-read_three_end if end-read_three_end <= before+after else end-start
+
+            cov[cov_start: cov_end] += 1            
+            n += 1
+    
+    if return_raw:
+        return cov
+
+    if n > min_counts:
+        if bins > 1:
+            cov = get_bin_cov(cov, bins)
+        cov = cov / sum(cov)
+        return cov
+
+
+def bam_reference_point(
+    infile: str, 
+    site_info: list,
+    before: int = 1000, after : int = 1000,
+    bins: int = 100,
+    min_counts: int = 1,
+    chrom_prefix: str = '',
+    exclude_chr = None,
+    threads=64):
+    '''
+    Reference-point refers to a position within a BED region (e.g., the starting point). In this mode, only those genomicpositions before (upstream) and/or after (downstream) of the reference point will be used.
+
+    Args:
+        infile: path to bigWig file
+        site_info: [(chrom, site, strand, gene_id), ...]
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        min_counts: minimum number of the reads
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    chrom = site_info[:, 0]
+    site = site_info[:, 1]
+    strand = site_info[:, 2]
+    gene_id = site_info[:, 3]
+
+    with ProcessPoolExecutor(max_workers=threads) as e:
+        chunksize = int(len(site_info)/threads)
+        results = e.map(
+            bam_site_cov, 
+            repeat(infile),
+            chrom,
+            site,
+            strand,
+            gene_id,
+            repeat(before),
+            repeat(after),
+            repeat(bins),
+            repeat(min_counts),
+            repeat(chrom_prefix),
+            repeat(exclude_chr),
+            chunksize=chunksize)
+    
+    cov = []
+    n = 0
+    for res in results:
+        if res is not None:
+            cov.append(res)
+    
+    cov = np.nanmean(cov, axis=0)
+    return cov
+
+
+# scale region
+def bam_scale_cov(
+    infile: str, 
+    chrom: str, site1: int, site2: int, strand: str, gene_id: str,
+    before: int = 1000, after : int = 1000, regionbody : int = 1000, 
+    bins: int = 100,
+    split: bool = False,
+    min_counts: int = 1,
+    chrom_prefix: str = '',
+    exclude_chr = None
+    ):
+    '''
+    Args:
+        infile: path to BAM file
+        chrom: chromosome name
+        site1: 5' site
+        site2: 3' site
+        strand: '+' or '-'
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        split: split mode
+        min_count: minimum number of reads in the region
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    site1 = int(site1)
+    site2 = int(site2)
+    region_len = site2-site1
+    chrom = str(chrom)
+    strand_is_reverse = False if strand == '+' else True
+
+    if exclude_chr is not None and chrom in exclude_chr:
+        return
+
+    chrom = chrom_prefix + chrom
+
+    if split:
+        cov1 = bam_site_cov(infile, chrom, site1, strand, gene_id, before=before, after=after, bins=bins, return_raw=True)
+        cov2 = bam_site_cov(infile, chrom, site2, strand, gene_id, before=before, after=after, bins=bins, return_raw=True)
+
+        if cov1 is None or cov2 is None:
+            return
+            
+        sum_cov = sum(cov1) + sum(cov2)
+        if sum_cov > 0:
+            cov1 = cov1 / sum_cov
+            cov2 = cov2 / sum_cov
+            if strand == '+':
+                return cov1, cov2
+            elif strand == '-':
+                return cov2, cov1
+            
+    else:
+        if strand == '+':
+            start = site1-before
+            end = site2+after
+        else:
+            start = site1-after
+            end = site2+before
+
+        cov = np.zeros(before+region_len+after)
 
         with pysam.AlignmentFile(infile, 'rb') as inbam:
+            if start < 0 or end > inbam.get_reference_length(chrom):
+                return
+            n = 0
             for read in inbam.fetch(chrom, start, end):
                 # 判断是否跟基因是同个方向，针对于链特异文库
-                read_strand = read.is_reverse
-                if strand_boo is not read_strand:
+                if read.is_reverse != strand_is_reverse:
                     continue
-                
+                    
                 read_gene_id = read.get_tag('gi')
                 if read_gene_id not in {gene_id, 'None'}:
                     continue
@@ -282,41 +577,110 @@ def get_bam_cov(
                     read_five_end = read.reference_start
                     read_three_end = read.reference_end
                     cov_start = read_five_end-start if read_five_end-start >= 0 else 0
-                    cov_end = read_three_end-start if read_three_end-start <= before+after else end-start
+                    cov_end = read_three_end-start if read_three_end-start <= before+after+region_len else end-start
                 else:
                     read_five_end = read.reference_end
                     read_three_end = read.reference_start
                     cov_start = end-read_five_end if end-read_five_end >= 0 else 0
-                    cov_end = end-read_three_end if end-read_three_end <= before+after else end-start
+                    cov_end = end-read_three_end if end-read_three_end <= before+after+region_len else end-start
 
-                cov[cov_start: cov_end] += 1
-                
-                if read.query_name not in read_set:
-                    n += 1
-                    read_set.add(read.query_name)
-        
-        cov_list.append(cov)
-    
-    if max(cov_list[1]) > 20:
-        # 只返回与PAS有>20条reads overlap的基因
-        return cov_list[0], cov_list[1], n, gene_id
-
-
-def get_bam_meta_result(infile, gene_list, before=2000, after=2000, threads=64, site1: str ='TTS', site2: str ='PAS'):
-    results = []
-    with ProcessPoolExecutor(max_workers=threads) as e:
-        chunksize = int(len(gene_list)/threads)
-        results = e.map(get_bam_cov, repeat(infile), gene_list, repeat(before), repeat(after), repeat(site1), repeat(site2), chunksize=chunksize)
-    
-    tss_cov, pas_cov = np.zeros(before+after), np.zeros(before+after)
-    n = 0
-    for res in results:
-        if res is not None:
-            tss_cov += res[0]/res[2]
-            pas_cov += res[1]/res[2]
-            n += 1
+                cov[cov_start: cov_end] += 1            
+                n += 1
             
-    return tss_cov, pas_cov, n
+            if n > min_counts:
+                cov_gb = cov[before: before+region_len]
+                cov_gb = scipy.ndimage.zoom(
+                    cov_gb,
+                    regionbody / len(cov_gb),
+                    order=0,
+                    mode='nearest')
+                cov_5 = cov[ : before]
+                cov_3 = cov[before+region_len : ]
+                cov = np.concatenate([cov_5, cov_gb, cov_3])
+
+                if bins > 1:
+                    cov = get_bin_cov(cov, bins)
+                cov = cov / sum(cov)
+                
+                return cov
+
+
+def bam_scale_region(
+    infile: str, 
+    site_info: list,
+    before: int = 1000, after: int = 1000, regionbody: int = 1000,
+    bins: int = 100,
+    split: bool = False,
+    min_counts: int = 1,
+    chrom_prefix: str = '',
+    exclude_chr = None,
+    threads=64):
+    '''
+    Reference-point refers to a position within a BED region (e.g., the starting point). In this mode, only those genomicpositions before (upstream) and/or after (downstream) of the reference point will be used.
+
+    Args:
+        infile: path to BAM file
+        site_info: [(chrom, site1, site2, strand, gene_id), ...]
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        split: split mode
+        min_counts: minimum number of the reads
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    chrom = site_info[:, 0]
+    site1 = site_info[:, 1]
+    site2 = site_info[:, 2]
+    strand = site_info[:, 3]
+    gene_id = site_info[:, 4]
+
+    with ProcessPoolExecutor(max_workers=threads) as e:
+        chunksize = int(len(site_info)/threads)
+        results = e.map(
+            bam_scale_cov, 
+            repeat(infile),
+            chrom,
+            site1,
+            site2,
+            strand,
+            gene_id,
+            repeat(before),
+            repeat(after),
+            repeat(regionbody),
+            repeat(bins),
+            repeat(split),
+            repeat(min_counts),
+            repeat(chrom_prefix),
+            repeat(exclude_chr),
+            chunksize=chunksize)
+    
+
+    if split:
+        cov_5, cov_3 = [], []
+        for res in results:
+            if res is not None:
+                cov_5_, cov_3_ = res
+                cov_5.append(cov_5_)
+                cov_3.append(cov_3_)
+
+        cov_5 = np.nanmean(cov_5, axis=0) / bins
+        cov_3 = np.nanmean(cov_3, axis=0) / bins
+        
+        return cov_5, cov_3
+
+    else:
+        cov = []
+        for res in results:
+            if res is not None:
+                cov.append(res)
+        
+        cov = np.nanmean(cov, axis=0) / bins
+        return cov
 
 
 def get_bam_total_readcounts(infile: str):
@@ -343,3 +707,32 @@ def plot(ax, cov, n, before=2000, after=2000, target_site=0, label=None, ylabel=
     ax.axvline(before, ls='--', color='#555555')
     if label is not None:
         ax.legend(frameon=False)
+
+
+def set_ax(
+    ax, 
+    bins,
+    b1: int = None, a1: int = None, 
+    b2: int = None, a2: int = None, 
+    site1: str = 0, site2: str = 0,
+    ylabel=None
+    ):
+    if type(ax) is not np.ndarray:
+        ax = [ax]
+    
+    if b1 is not None and a1 is not None:
+        ax[0].spines['right'].set_visible(False)
+        ax[0].spines['top'].set_visible(False)
+        ax[0].set_ylabel(ylabel)
+        ax[0].set_xticks([0, b1//bins, (a1+b1)//bins])
+        ax[0].set_xticklabels([f'-{b1//1000} kb', site1, f'{a1//1000} kb'], rotation=90)
+        ax[0].axvline(b1//bins, ls='--', color='#555555')
+    
+    if b2 is not None and a2 is not None:
+        ax[1].spines['right'].set_visible(False)
+        ax[1].spines['left'].set_visible(False)
+        ax[1].spines['top'].set_visible(False)
+        ax[1].yaxis.set_ticks_position('none')
+        ax[1].set_xticks([0, b2//bins, (a2+b2)//bins])
+        ax[1].set_xticklabels([f'-{b2//1000} kb', site2, f'{a2//1000} kb'], rotation=90)
+        ax[1].axvline(b2//bins, ls='--', color='#555555')
