@@ -21,6 +21,12 @@ resolution=config['resolution']
 ruleorder: 
     pair_dropdu > pair_sort > pair_parse
 
+onsuccess:
+    shell("send.py log -l {log}")
+
+onerror:
+    shell("send.py log -l {log} --return_code 1")
+
 rule all:
     input:
         expand('{SAMPLE}.hic.q{MAPQ}.resolution_{RESOLUTION}.mcool', SAMPLE=sample, MAPQ=mapq, RESOLUTION=resolution)
@@ -57,7 +63,7 @@ pairsamtools parse --nproc-in {threads} --nproc-out {threads} --min-mapq {params
 
 rule pair_sort:
     input:
-        '{sample}.hic.q{MAPQ}.pairsam'
+        rules.pair_parse.output
     output:
         temp('{sample}.hic.q{MAPQ}.sorted.pairsam')
     threads: 32
@@ -71,7 +77,7 @@ pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G --tmpd
 #this step only keep UU UR RU 
 rule pair_dropdu: 
     input:
-        '{sample}.hic.q{MAPQ}.sorted.pairsam'
+        rules.pair_sort.output
     output:
         temp("{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam")
     threads: 32

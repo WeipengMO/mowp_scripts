@@ -31,6 +31,12 @@ else:
     sample = [os.path.basename(fn).split('.fastq')[0] for fn in glob('raw_data/*.gz')]
 meth_type = ['cg','chg','chh']
 
+onsuccess:
+    shell("send.py log -l {log}")
+
+onerror:
+    shell("send.py log -l {log} --return_code 1")
+
 rule all:
     input:
         expand('aligned_data/{sample}.bam', sample=sample),
