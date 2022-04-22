@@ -2,16 +2,17 @@
 # -*- coding: utf-8 -*-
 '''
 Author       : windz
-Date         : 2022-03-21 10:56:29
-LastEditTime : 2022-03-23 23:34:33
-LastEditors  : windz
 FilePath     : plot.py
 '''
 
+import matplotlib as mpl
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.colors import Normalize
+from scipy.interpolate import interpn
 
 
 def color_pal(key):
@@ -30,6 +31,23 @@ def color_pal(key):
     }
 
     return color_palette[key]
+
+
+def despine(ax, top=True, right=True, left=False, bottom=False, xaxis=False, yaxis=False):
+    if top:
+        ax.spines['top'].set_visible(False)
+    if right:
+        ax.spines['right'].set_visible(False)
+    if left:
+        ax.spines['left'].set_visible(False)
+    if bottom:
+        ax.spines['bottom'].set_visible(False)
+
+    if xaxis:
+        ax.get_xaxis().set_visible(False)
+    if yaxis:
+        ax.get_yaxis().set_visible(False)
+
 
 
 def plot_scatter_plot(
@@ -120,7 +138,8 @@ def boxplot_with_jitter(
     data: list, 
     figsize: tuple = (3, 3), 
     widths = .5, 
-    subsample = 1, 
+    subsample = 1,
+    ax = None,
     labels=None
 ):
     '''
@@ -134,26 +153,26 @@ def boxplot_with_jitter(
     from random import sample
 
     if subsample > 1:
-        raise ValueError(f'{subsample=}, must <= 1')
+        raise ValueError(f'subsample={subsample}, must <= 1')
 
-    plt.figure(figsize=figsize)
-    plt.boxplot(
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    ax.boxplot(
         data,
         labels=labels,
         widths=widths,
         showfliers=False
     )
 
-    ylim = plt.ylim()
+    ylim = ax.get_ylim()
     for i in range(len(data)):
         y = sample(list(data[i]), int(subsample*len(data[i])))
         x = np.random.normal(1+i, 0.04, size=len(y))
-        plt.scatter(x, y, s=1, color='grey', alpha=.5)
+        ax.scatter(x, y, s=1, color='grey', alpha=.5)
 
-    ylim = plt.ylim(ylim)
+    ylim = ax.set_ylim(ylim)
 
-    sns.despine(top=True, right=True)
-    ax = plt.gca()
+    despine(ax, top=True, right=True)
 
     return ax
 
@@ -167,6 +186,26 @@ def step_histplot(
     figsize=(4, 3),
     bbox_to_anchor: tuple = (1, 0, .5, 1)
 ):
+    '''This function takes a list of data and plots a histogram of the data.
+    
+    Parameters
+    ----------
+    data : list
+        list of data to be plotted
+    bins, optional
+        number of bins to use
+    labels
+        list of strings, optional
+    stat, optional
+        'density' or 'count'
+    xlabel
+        str
+    figsize
+        tuple = (width, height)
+    bbox_to_anchor : tuple
+        tuple = (1, 0, .5, 1)
+    
+    '''
     if labels is not None:
         labels = iter(labels)
     else:
@@ -197,6 +236,22 @@ def read_count_per_gene(
     all_gene_counts = None,
     ylabel = 'Gene counts',
     ):
+    '''This function plots the number of reads per gene for a given sample
+    
+    Parameters
+    ----------
+    gene_counts : dict
+        a dictionary of gene counts
+    bs
+        the bin size for the histogram
+    max_counts, optional
+        the maximum number of counts to plot.
+    all_gene_counts
+        a list of all the counts for all genes.
+    ylabel, optional
+        the label for the y-axis
+    
+    '''
     if all_gene_counts is None:
         # 如果没有给出基因总数，则默认注释文件里面的基因总数
         from utils.get_overlap_genes import _, total_gene_counts
@@ -225,5 +280,132 @@ def read_count_per_gene(
     sns.despine(top=True, right=True)
 
     ax = plt.gca()
+
+    return ax
+
+
+def density_scatter(x, y, sort=True, bins=20, figsize=(4, 4), **kwargs):
+    '''It takes in two lists of numbers, and returns a scatter plot with the points colored by the density of points in the 2D histogram
+    
+    Parameters
+    ----------
+    x
+        x-coordinates of the points
+    y
+        y-coordinates of the points
+    sort, optional
+        If True, the points are colored by density, so that the densest points are plotted last.
+    bins, optional
+        The number of bins to use for the histogram.
+    figsize
+        the size of the figure
+    
+    '''
+
+    fig, ax = plt.subplots(figsize=figsize)
+    data, x_e, y_e = np.histogram2d(x, y, bins=bins, density=True)
+    z = interpn((0.5*(x_e[1:] + x_e[:-1]), 0.5*(y_e[1:]+y_e[:-1])),
+                data, np.vstack([x, y]).T, method="splinef2d", bounds_error=False)
+
+    # To be sure to plot all data
+    z[np.where(np.isnan(z))] = 0.0
+
+    # Sort the points by density, so that the densest points are plotted last
+    if sort:
+        idx = z.argsort()
+        x, y, z = x[idx], y[idx], z[idx]
+
+    ax.scatter(x, y, c=z, **kwargs)
+
+    norm = Normalize(vmin=np.min(z), vmax=np.max(z))
+
+    # The dimensions [left, bottom, width, height] of the new Axes. 
+    # All quantities are in fractions of figure width and height.
+    cax = fig.add_axes([0.95, 0.1, 0.03, .8])
+    
+    cbar = fig.colorbar(
+        cm.ScalarMappable(norm=norm), 
+        cax, orientation='vertical')
+    cbar.ax.set_ylabel('Density')
+
+    return ax
+
+
+def karyotype(
+        data: dict, 
+        genome_size: dict,
+        height: float = .9,
+        spacing: float = .9,
+        marker_linewidth: float = .5,
+        marker_color: str = 'k',
+        chrom_color: str = '#EEEEEE',
+        formatter: str = None,
+        ax = None,
+        figsize: tuple =(12, 8)):
+    '''This function plots the karyotype of a genome.
+    
+    Parameters
+    ----------
+    data : dict
+        a dictionary of chromosome names and the position of site, and extend length, eg:
+        {'chr1': (1, 1), 'chr2': (100, 200), 'chr3': (50, 1)}
+    genome_size : dict
+        a dictionary of chromosome names and their sizes
+    height : float
+        the height of the chromosome
+    spacing : float
+        the spacing between chromosomes
+    marker_linewidth : float
+        the width of the line that separates the chromosomes
+    marker_color : str, optional
+        color of the marker lines
+    chrom_color : str, optional
+        The color of the chromosome.
+    formatter : str
+        str = None,
+    ax: matplotlib.axes.Axes, optional
+        the axis to plot on
+    figsize
+        tuple, optional
+    
+    '''
+
+    from utils.annotation import natural_keys
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    yticks, yticklabels, ymin = [], [], 0
+    for chrom in sorted(genome_size, key=natural_keys):
+        ax.broken_barh(
+            [(0, genome_size[chrom])], (ymin, height), 
+            facecolors=chrom_color, edgecolor='k', linewidth=1)
+        
+        if chrom in data:
+            xranges = data[chrom]
+            ax.broken_barh(
+                xranges, (ymin, height),
+                facecolors=marker_color, edgecolor=marker_color, linewidth=marker_linewidth)
+            
+        yticks_pos = ymin + height/2
+        yticks.append(yticks_pos)
+        yticklabels.append(chrom)
+                        
+        ymin += height + spacing
+
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticklabels)
+
+    if formatter is not None:
+        if formatter == 'G':
+            fmt = lambda x, pos: '%1.0f' % (x * 1e-6)
+        if formatter == 'M':
+            fmt = lambda x, pos: '%1.0f' % (x * 1e-6)
+        elif formatter == 'K':
+            fmt = lambda x, pos: '%1.0f' % (x * 1e-3)
+        ax.xaxis.set_major_formatter(mpl.ticker.FuncFormatter(fmt))
+        ax.set_xlabel(f'chromsome size ({formatter}b)')
+    else:
+        ax.set_xlabel('chromsome size')
 
     return ax

@@ -1,11 +1,5 @@
 #!/usr/bin/env python
 # coding=utf-8
-'''
-Date         : 2021-01-22 17:36:35
-LastEditors  : windz
-LastEditTime : 2022-04-10 15:22:06
-FilePath     : metaplot.py
-'''
 
 import numpy as np
 import pyBigWig
@@ -685,8 +679,12 @@ def bam_scale_region(
 
 def get_bam_total_readcounts(infile: str):
     """
-    获取bam文件中所有reads数
+    This function takes a bam file and returns the total number of reads in the file.
+    
+    Args:
+      infile (str): the input bam file
     """
+
     return eval('+'.join([line.split('\t')[2] for line in pysam.idxstats(infile).rstrip().split('\n')]))
 
 
@@ -717,6 +715,21 @@ def set_ax(
     site1: str = 0, site2: str = 0,
     ylabel=None
     ):
+    """
+    This function takes in a matplotlib axis object, a list of bins, and two sets of bin numbers and
+    site names, and returns a histogram of the bins with the two sets of bins highlighted
+    
+    Args:
+      ax: the axis to plot on
+      bins: the bins for the histogram
+      b1 (int): int = None, a1: int = None,
+      a1 (int): int = None, b1: int = None, a2: int = None, b2: int = None,
+      b2 (int): int = None, a2: int = None,
+      a2 (int): int = None,
+      site1 (str): str = 0, site2: str = 0,. Defaults to 0
+      site2 (str): str = 0,. Defaults to 0
+      ylabel: str
+    """
     if type(ax) is not np.ndarray:
         ax = [ax]
     
