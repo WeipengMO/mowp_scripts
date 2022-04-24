@@ -1,0 +1,26 @@
+configfile: 'config.yml'
+SAMPLE_NAME = config['sample_name']
+
+onsuccess:
+    shell("send.py log -l {log}")
+
+onerror:
+    shell("send.py log -l {log} --return_code 1")
+
+include:
+    "snakemake/add_tags.smk"
+
+include:
+    "snakemake/counts.smk"
+
+rule all:
+    input:
+        expand('aligned_data/{sample_name}.sorted.bam', sample_name=SAMPLE_NAME),
+        expand('elongating_data/{sample_name}.elongating.bam', sample_name=SAMPLE_NAME),
+        expand('polyadenylated_data/{sample_name}.polyadenylated.bam', sample_name=SAMPLE_NAME),
+
+rule counts:
+    input:
+        'featureCounts/{sample_name}.counts_genes.txt',
+        'stringtie/{sample_name}.gene_abund.tsv'
+
