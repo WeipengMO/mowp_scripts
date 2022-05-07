@@ -1,0 +1,11 @@
+meryl_path: /public/home/mowp/softwares/meryl-1.3/bin/meryl
+
+# snakemake
+aligner: winnnowmap  # lra or winnnowmap
+workdir: .
+
+# sample
+samples: ['GM24385.nf7.chr20_af_minimap2']
+
+# genome
+genome: tutorial/chr20_human_g1k_v37.fasta

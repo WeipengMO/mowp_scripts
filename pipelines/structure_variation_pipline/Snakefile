@@ -1,0 +1,41 @@
+import os
+from glob import glob
+
+configfile: 
+    "config.yml"
+
+workdir:
+    config['workdir']
+
+aligner = config['aligner']
+if aligner == 'lra':
+    snakefile = 'lra.smk'
+elif aligner == 'winnowmap':
+    snakefile = 'winnowmap.smk'
+include:
+    "snakemake/"+snakefile
+
+include:
+    'snakemake/call_sv.smk'
+
+include:
+    'snakemake/call_methylation.smk'
+
+include:
+    'snakemake/nanonome_data_parse.smk'
+
+onsuccess:
+    shell("send.py log -l {log}")
+
+onerror:
+    shell("send.py log -l {log} --return_code 1")
+
+
+sample = config['samples']
+mod = config['mod']
+
+rule all:
+    input:
+        expand('cuteSV/{sample}.cuteSV.vcf', sample=sample),
+        expand('bigwig/{sample}.{mod}.{type}.bw', sample=sample, mod=mod, type=['methylation', 'methcoverage'])
+

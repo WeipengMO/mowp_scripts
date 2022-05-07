@@ -2,7 +2,7 @@
 # coding=utf-8
 '''
 Date         : 2021-08-26 10:29:53
-LastEditTime : 2022-04-05 20:15:00
+LastEditTime : 2022-04-07 16:14:16
 LastEditors  : windz
 FilePath     : metaplot_bs_seq.py
 '''

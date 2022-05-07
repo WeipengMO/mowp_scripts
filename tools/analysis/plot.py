@@ -178,13 +178,14 @@ def boxplot_with_jitter(
 
 
 def step_histplot(
-    data: list,
+    *data: list,
     bins = 'auto',
     labels = None,
     stat = 'density',
     xlabel = None,
     figsize=(4, 3),
-    bbox_to_anchor: tuple = (1, 0, .5, 1)
+    bbox_to_anchor: tuple = (1, 0, .5, 1),
+    ax = None,
 ):
     '''This function takes a list of data and plots a histogram of the data.
     
@@ -206,23 +207,24 @@ def step_histplot(
         tuple = (1, 0, .5, 1)
     
     '''
-    if labels is not None:
-        labels = iter(labels)
-    else:
-        labels = iter([None]*len(data))
+    if labels is None:
+        labels = [None]*len(data)
 
-    plt.figure(figsize=figsize)
-    for _data in data:
-        ax = sns.histplot(
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    for _data, label in zip(data, labels): 
+        sns.histplot(
             _data,
             fill=False,
             stat=stat,
             element='step',
             bins=bins,
-            label=next(labels)
+            label=label
         )
 
     ax.legend(frameon=False, bbox_to_anchor=bbox_to_anchor)
+
     plt.xlabel(xlabel)
     sns.despine(top=True, right=True)
 
@@ -338,8 +340,10 @@ def karyotype(
         spacing: float = .9,
         marker_linewidth: float = .5,
         marker_color: str = 'k',
+        marker_alpha: float = 1,
         chrom_color: str = '#EEEEEE',
         formatter: str = None,
+        annotation_region: dict = None,
         ax = None,
         figsize: tuple =(12, 8)):
     '''This function plots the karyotype of a genome.
@@ -382,10 +386,15 @@ def karyotype(
             facecolors=chrom_color, edgecolor='k', linewidth=1)
         
         if chrom in data:
+            if annotation_region is not None:
+                xranges = annotation_region[chrom]
+                ax.broken_barh(xranges, (ymin, height), 
+                               facecolors='k', edgecolor='k', linewidth=marker_linewidth, alpha=.25)
+
             xranges = data[chrom]
             ax.broken_barh(
                 xranges, (ymin, height),
-                facecolors=marker_color, edgecolor=marker_color, linewidth=marker_linewidth)
+                facecolors=marker_color, edgecolor=marker_color, linewidth=marker_linewidth, alpha=marker_alpha)
             
         yticks_pos = ymin + height/2
         yticks.append(yticks_pos)
@@ -398,7 +407,7 @@ def karyotype(
 
     if formatter is not None:
         if formatter == 'G':
-            fmt = lambda x, pos: '%1.0f' % (x * 1e-6)
+            fmt = lambda x, pos: '%1.0f' % (x * 1e-9)
         if formatter == 'M':
             fmt = lambda x, pos: '%1.0f' % (x * 1e-6)
         elif formatter == 'K':

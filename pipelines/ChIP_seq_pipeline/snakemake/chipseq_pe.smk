@@ -1,17 +1,3 @@
-'''
-Author       : windz
-Date         : 2020-09-04 14:47:27
-LastEditTime : 2021-08-02 18:22:32
-Description  :
-'''
-
-
-sample_name = []
-with open('raw_data/sample_name.txt', 'r') as f:
-    for line in f:
-        sample_name.append(line.rstrip())
-
-
 rule run_fastp:
     input:
         fq1='raw_data/{sample_name}_1.fastq.gz',

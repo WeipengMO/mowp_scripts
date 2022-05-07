@@ -31,7 +31,7 @@ rule bamCoverage_strand:
     input:
         'aligned_data/{sample_name}.sorted.rmdup.bam'
     output:
-        expand('bw_files/{sample_name}.sorted.rmdup.{strand}.bw', strand = ['fwd', 'rev'])
+        'bw_files/{sample_name}.sorted.rmdup.{strand}.bw'
     threads: 16
     params:
         strand=lambda wildcard: 'reverse' if wildcard.strand == 'fwd' else 'forward' 

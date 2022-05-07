@@ -22,5 +22,6 @@ rule all:
 rule counts:
     input:
         'featureCounts/{sample_name}.counts_genes.txt',
-        'stringtie/{sample_name}.gene_abund.tsv'
+        'stringtie/{sample_name}.gene_abund.tsv',
+        expand('bw_files/{sample_name}.sorted.rmdup.{strand}.bw', sample_name=SAMPLE_NAME, strand=['fwd', 'rev']),
 

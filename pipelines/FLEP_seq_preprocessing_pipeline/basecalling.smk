@@ -13,6 +13,8 @@ dirname = [i for i in range(split_num)]
 sample = config['sample']
 fast5_path = config['fast5_path']
 
+localrules: all, split_fast5_files
+
 rule all:
     input:
         expand('guppy_out/{dirname}/sequencing_summary.txt', dirname=dirname),
