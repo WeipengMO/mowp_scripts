@@ -63,25 +63,29 @@ def get_site_cov(
     chrom = chrom_prefix + chrom
         
     bwfile = pyBigWig.open(infile)
-    try:
-        if strand == '+':
-            methyratio = bwfile.values(
-                chrom, 
-                site - before,
-                site + after)
-            cov = get_bin_cov(methyratio, bins)
-
-        elif strand == '-':
-            methyratio = bwfile.values(
-                chrom, 
-                site - after,
-                site + before)[::-1]
-            cov = get_bin_cov(methyratio, bins)
-        else:
-            return ValueError('strand must be "+" or "-"')
-
-    except RuntimeError:
+    if strand == '+':
+        start = site - before
+        end = site + after
+    else:
+        start = site - after
+        end = site + before
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        # remove Invalid interval
         return
+
+    if strand == '+':
+        values = bwfile.values(
+            chrom, 
+            start,
+            end)
+        cov = get_bin_cov(values, bins)
+
+    elif strand == '-':
+        values = bwfile.values(
+            chrom, 
+            start,
+            end)[::-1]
+        cov = get_bin_cov(values, bins)
 
     return cov
 
@@ -193,41 +197,45 @@ def get_scale_cov(
     chrom = chrom_prefix + chrom
 
     bwfile = pyBigWig.open(infile)
-    try:
-        if strand == '+':
-            methyratio_5 = bwfile.values(chrom, site1 - before, site1)
-            cov_5 = get_bin_cov(methyratio_5, bins)
-            methyratio_3 = bwfile.values(chrom, site2, site2 + after)
-            cov_3 = get_bin_cov(methyratio_3, bins)
-
-            # gene_body_region
-            methyratio_gb = bwfile.values(chrom, site1, site2)
-            methyratio_gb = scipy.ndimage.zoom(
-                methyratio_gb,
-                regionbody / len(methyratio_gb),
-                order=0,
-                mode='nearest')
-            cov_gb = get_bin_cov(methyratio_gb, bins)
-
-        elif strand == '-':
-            methyratio_5 = bwfile.values(chrom, site2 + before, site1)[::-1]
-            cov_5 = get_bin_cov(methyratio_5, bins)
-            methyratio_3 = bwfile.values(chrom, site2, site2 - after)[::-1]
-            cov_3 = get_bin_cov(methyratio_3, bins)
-
-            # gene_body_region
-            methyratio_gb = bwfile.values(chrom, site1, site2)[::-1]
-            methyratio_gb = scipy.ndimage.zoom(
-                methyratio_gb,
-                regionbody / len(methyratio_gb),
-                order=0,
-                mode='nearest')
-            cov_gb = get_bin_cov(methyratio_gb, bins)
-        else:
-            raise ValueError('strand must be "-" or "+"')
-
-    except RuntimeError:
+    if strand == '+':
+        start = site1 - before
+        end = site2 + after
+    else:
+        start = site1 - after
+        end = site2 + before
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        # remove Invalid interval
         return
+    
+    if strand == '+':
+        cov_5 = bwfile.values(chrom, start, site1)
+        cov_5 = get_bin_cov(cov_5, bins)
+        cov_3 = bwfile.values(chrom, site2, end)
+        cov_3 = get_bin_cov(cov_3, bins)
+        # gene_body_region
+        cov_gb = bwfile.values(chrom, site1, site2)
+        cov_gb = scipy.ndimage.zoom(
+            cov_gb,
+            regionbody / len(cov_gb),
+            order=0,
+            mode='nearest')
+        cov_gb = get_bin_cov(cov_gb, bins)
+
+    elif strand == '-':
+        cov_5 = bwfile.values(chrom, site2, end)[::-1]
+        cov_5 = get_bin_cov(cov_5, bins)
+        cov_3 = bwfile.values(chrom, start, site1)[::-1]
+        cov_3 = get_bin_cov(cov_3, bins)
+        # gene_body_region
+        cov_gb = bwfile.values(chrom, site1, site2)[::-1]
+        cov_gb = scipy.ndimage.zoom(
+            cov_gb,
+            regionbody / len(cov_gb),
+            order=0,
+            mode='nearest')
+        cov_gb = get_bin_cov(cov_gb, bins)
+    else:
+        raise ValueError('strand must be "-" or "+"')
     
     cov = np.concatenate([cov_5, cov_gb, cov_3])
 
