@@ -287,11 +287,13 @@ def get_meta_scale_result(
             chunksize=chunksize)
 
     cov = []
+    n = 0
     for res in results:
         if res is not None:
             cov_ = res
             cov.append(cov_)
-
+            n += 1
+    print(f'number of sites: {n}')
     cov = np.nanmean(cov, axis=0)
     return cov
 

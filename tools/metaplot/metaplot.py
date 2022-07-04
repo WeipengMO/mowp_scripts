@@ -154,6 +154,7 @@ def bw_scale_cov(
     bins: int = 100,
     split: bool = False,
     chrom_prefix: str = '',
+    normalized: str = 'density',
     exclude_chr = None
     ):
     '''
@@ -168,6 +169,7 @@ def bw_scale_cov(
         regionbody: distance in bases to which all regions will be fit
         bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
         chrom_prefix: prefix of the chromosome name, eg. "chr"
+        normalized: normalization method, 'density' or 'count'
         exclude_chr: chromosomes to be excluded
     
     Return:
@@ -262,7 +264,8 @@ def bw_scale_cov(
         cov = np.nan_to_num(cov)
 
         if sum(cov) > 0:
-            cov = cov / sum(cov)  # density
+            if normalized == 'density':
+                cov = cov / sum(cov)  # density
             return cov
 
 
@@ -273,6 +276,7 @@ def bw_scale_regions(
     bins: int = 100,
     split: bool = False,
     chrom_prefix: str = '',
+    normalized: str = 'density',
     exclude_chr = None,
     threads=64):
     '''
@@ -286,6 +290,7 @@ def bw_scale_regions(
         regionbody: distance in bases to which all regions will be fit
         bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
         chrom_prefix: prefix of the chromosome name, eg. "chr"
+        normalized: normalization method, 'density' or 'count'
         exclude_chr: chromosomes to be excluded
     
     Return:
@@ -312,6 +317,7 @@ def bw_scale_regions(
             repeat(bins),
             repeat(split),
             repeat(chrom_prefix),
+            repeat(normalized),
             repeat(exclude_chr),
             chunksize=chunksize)
 

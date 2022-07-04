@@ -184,7 +184,7 @@ def step_histplot(
     stat = 'density',
     xlabel = None,
     figsize=(4, 3),
-    bbox_to_anchor: tuple = (1, 0, .5, 1),
+    bbox_to_anchor: tuple = (1, 1),
     ax = None,
 ):
     '''This function takes a list of data and plots a histogram of the data.
@@ -204,7 +204,7 @@ def step_histplot(
     figsize
         tuple = (width, height)
     bbox_to_anchor : tuple
-        tuple = (1, 0, .5, 1)
+        tuple = (1, 1)
     
     '''
     if labels is None:
