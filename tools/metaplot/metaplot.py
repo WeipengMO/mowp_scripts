@@ -142,7 +142,7 @@ def bw_reference_point(
         if cov_ is not None:
             cov.append(cov_)
 
-    cov = np.nanmean(cov, axis=0) / bins
+    cov = np.nanmean(cov, axis=0)
     return cov
 
 
@@ -329,9 +329,8 @@ def bw_scale_regions(
                 cov_5.append(cov_5_)
                 cov_3.append(cov_3_)
 
-        cov_5 = np.nanmean(cov_5, axis=0) / bins
-        cov_3 = np.nanmean(cov_3, axis=0) / bins
-
+        cov_5 = np.nanmean(cov_5, axis=0)
+        cov_3 = np.nanmean(cov_3, axis=0)
         return cov_5, cov_3
 
     else:
@@ -340,7 +339,7 @@ def bw_scale_regions(
             if cov_ is not None:
                 cov.append(cov_)
 
-        cov = np.nanmean(cov, axis=0) / bins
+        cov = np.nanmean(cov, axis=0)
         return cov
 
 
@@ -668,8 +667,8 @@ def bam_scale_region(
                 cov_5.append(cov_5_)
                 cov_3.append(cov_3_)
 
-        cov_5 = np.nanmean(cov_5, axis=0) / bins
-        cov_3 = np.nanmean(cov_3, axis=0) / bins
+        cov_5 = np.nanmean(cov_5, axis=0)
+        cov_3 = np.nanmean(cov_3, axis=0)
         
         return cov_5, cov_3
 
@@ -679,7 +678,7 @@ def bam_scale_region(
             if res is not None:
                 cov.append(res)
         
-        cov = np.nanmean(cov, axis=0) / bins
+        cov = np.nanmean(cov, axis=0)
         return cov
 
 

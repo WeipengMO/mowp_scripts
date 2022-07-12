@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Author       : windz
-Date         : 2021-01-13 10:40:39
-LastEditTime : 2021-05-15 16:54:56
-Description  : 
-"""
-
-
 import os
 import matplotlib.patches as mp
 import matplotlib.pyplot as plt
@@ -17,7 +9,7 @@ import pandas as pd
 import pysam
 import seaborn as sns
 from typing import Optional, Sequence, Tuple, Mapping
-
+import pyBigWig
 
 ######
 # plot gene model
@@ -31,6 +23,7 @@ def plot_gene_model(
     fig_end: int,
     gene_color: str = "k",
     y_space: int = 1,
+    plot_gene_id: bool = True
 ):
     """plot gene model in the axis
 
@@ -213,9 +206,10 @@ def plot_gene_model(
                 )
                 ax.add_patch(utr)
 
-        ax.annotate(
-            gene_id, xy=((chromStart + chromEnd) / 2, y_pos + height * 1.5), ha="center"
-        )
+        if plot_gene_id:
+            ax.annotate(
+                gene_id, xy=((chromStart + chromEnd) / 2, y_pos + height * 1.5), ha="center"
+            )
 
     # set ax
     ax.spines["right"].set_visible(False)
@@ -535,6 +529,8 @@ def convert_bam(
 
             try:
                 span_intron_count = read.get_tag('sn')  # span_intron_num
+                if type(span_intron_count) == str:
+                    span_intron_count = len(span_intron_count.split(':'))
                 unsplice_count = read.get_tag('rn')  # retention_intron_num
                 unsplice_intron = read.get_tag('ri')  # retention_introns
                 # only plot reads in gene_list
@@ -924,6 +920,7 @@ def plot_bam(
     y_space=1.5,  # the space between reads in yaxis
     gene_list=None,
     pal=None,
+    height: int = 0.5, # reads的高度
 ):
     """plot bam information to the ax
 
@@ -963,7 +960,6 @@ def plot_bam(
     gene_color_index = 0
 
     ylim = 0  # the start position of yaxis
-    height = 0.5  # reads的高度
     for item in bam_data.itertuples():
         (
             chrom,
@@ -1059,6 +1055,38 @@ def set_ax(ax, plot_xaxis=False):
         ax.xaxis.set_ticks_position("none")  # 去x刻度
 
 
+def plot_bw_track(ax, track_data, start, end, track_color: str = None, data_range: tuple = (None, None)):
+    '''This function takes in a matplotlib axis, a dataframe of track data, a start and end time, and a
+    color, and plots the track on the axis
+    
+    Parameters
+    ----------
+    ax
+        the axis to plot the track on
+    track_data
+        a list of tuples, each tuple is a point in the track
+    start
+        the start time of the track
+    end
+        the end of the track
+    track_color
+        the color of the track
+    
+    '''
+    ax.fill_between(np.linspace(start, end, end-start), track_data, color=track_color)
+    # set ax
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.yaxis.set_major_locator(ticker.NullLocator())
+    ax.xaxis.set_major_locator(ticker.NullLocator())
+    ax.xaxis.set_ticks_position("none")
+    # ax.set_xlim(start, end)
+    if not(None in data_range):
+        ax.set_ylim(data_range)
+
+
 ######
 # main Class
 ######
@@ -1110,6 +1138,13 @@ class IGV:
         self.tagRequiered = tag_required_dict
         self.colorList = []
         self.bamTitleList = []
+        self.gene_models = None
+        self.gene_model_ylim = 0
+        self.bw_track_list = []
+
+        self.gene_model_n = 0
+        self.bw_tracks_n = 0
+        self.bam_list_n = 0
 
     def add_bam(
         self,
@@ -1157,8 +1192,26 @@ class IGV:
         self.gene_list = gene_list
         self.colorList.append(read_color)
         self.bamTitleList.append(bam_title)
+        self.bam_list_n += 1
 
-    def add_gene_model(self, anno:str, gene_list=None, auto_create_gz=False, lambda_for_parse_geneId:Optional[str]=None):
+
+    def add_bw(
+        self,
+        infile: str,
+        color='#5D93C4',
+        chrom_prefix='',
+        data_range: tuple = (None, None),
+    ):
+        bw = pyBigWig.open(infile)
+        chrom = chrom_prefix + self.chrom
+        bw_data = bw.values(chrom, self.start, self.end)
+        bw_data = np.nan_to_num(bw_data)
+
+        self.bw_track_list.append((bw_data, color, data_range))
+        self.bw_tracks_n += 1
+
+
+    def add_gene_model(self, anno:str, gene_list=None, auto_create_gz=False, lambda_for_parse_geneId:Optional[str]=None, plot_gene_id: bool = True):
         """
         auto_create_gz: if provided bed is not compressed, the bgzip will be used to created the gz format file, corresponding index will also be built.
         lambda_for_parse_geneId: If not None, it will be used to parse the `gene_id` column in bed. None is equal to `x:x`
@@ -1175,33 +1228,69 @@ class IGV:
         self.gene_model_ylim = get_y_pos_continuous(
             self.gene_models, gene_list=gene_list, threshold=8
         )  # 不重叠y轴的基因数目
+        self.plot_gene_id = plot_gene_id
+        self.gene_model_n = 1
 
     def plot(
         self,
         height=5,
         width=10,
         gene_track_height=0.5,
+        bw_track_height=1,
         bam_track_height=4,
         gene_color="k",
         extend_xlim_start=False,
         extend_xlim_end=False,
         polya_site=None,
+        read_height: int = 0.5,
+        relative_pos: bool = True,
     ):
+        '''It plots the data.
+        
+        Parameters
+        ----------
+        height, optional
+            the height of the plot
+        width, optional
+            the width of the plot
+        gene_track_height
+            height of the gene track
+        bw_track_height, optional
+            height of the bigwig track
+        bam_track_height, optional
+            the height of the bam track
+        gene_color, optional
+            color of the gene track
+        extend_xlim_start, optional
+            If True, the x-axis will be extended to the left by the length of the left-most read.
+        extend_xlim_end, optional
+            If True, the x-axis will be extended to the right by the length of the right-most read.
+        polya_site
+            the position of the polyA site. If not provided, it will be plot the polyA site.
+        read_height : int
+            the height of the reads in the bam track
+        relative_pos : bool, optional
+            bool = True
+        
+        '''
 
-        nrows = len(self.bam_list) + 1  # bam_list track + gene model track
-        height_ratios = [self.gene_model_ylim * gene_track_height]  # 设置基因track的高度
-        height_ratios.extend([bam_track_height] * len(self.bam_list))  # 设置bam track的高度
+        gridspec_kw = [gene_track_height]*self.gene_model_n + [bw_track_height]*self.bw_tracks_n + [bam_track_height]*self.bam_list_n
+        nrows = self.gene_model_n + self.bw_tracks_n + self.bam_list_n
 
-        fig, ax = plt.subplots(
+        fig, axes = plt.subplots(
+            figsize=(width, height), 
             nrows=nrows,
-            gridspec_kw={"height_ratios": height_ratios},
-            figsize=(width, height),
+            gridspec_kw={"height_ratios": gridspec_kw},
             sharex=True,
         )
 
+        if nrows == 1:
+            axes = [axes]
+
+        axes_index = 0
         # plot gene_model
-        i = 0
-        if len(self.bam_list) == 0:
+        if self.gene_models is not None:
+            ax = axes[0]
             plot_gene_model(
                 ax,
                 self.gene_models,
@@ -1209,22 +1298,25 @@ class IGV:
                 self.end,
                 gene_color=gene_color,
                 y_space=6,
+                plot_gene_id=self.plot_gene_id,
             )
-        else:
-            plot_gene_model(
-                ax[0],
-                self.gene_models,
-                self.start,
-                self.end,
-                gene_color=gene_color,
-                y_space=6,
-            )
+            ax.patch.set_alpha(0)
+            axes_index += 1
+        
+        # plot bw_tracks
+        for bw_data, color, data_range in self.bw_track_list:
+            plot_bw_track(axes[axes_index], bw_data, self.start, self.end, color, data_range)
+            axes[axes_index].patch.set_alpha(0)
+            axes_index += 1
+            
 
         # plot bam files
-        for i, (bam_data, read_color, self.bamTitle) in enumerate(zip(self.bam_list, self.colorList, self.bamTitleList), 1):
-            plot_bam(ax[i], bam_data, self.start, self.end, gene_list=self.gene_list, read_color=read_color)
-            plot_xaxis = i == nrows - 1
-            set_ax(ax[i], plot_xaxis=plot_xaxis)
+        for bam_data, read_color, bamTitle in zip(self.bam_list, self.colorList, self.bamTitleList):
+            ax = axes[axes_index]
+
+            plot_bam(ax, bam_data, self.start, self.end, gene_list=self.gene_list, read_color=read_color, height=read_height)
+            plot_xaxis = axes_index == nrows - 1
+            set_ax(ax, plot_xaxis=plot_xaxis)
 
             # add polya site
             if polya_site is not None:
@@ -1234,52 +1326,66 @@ class IGV:
                     gene_id_ = gene_id_.split("_")[0]
                     if self.gene_list is not None:
                         if gene_id_ in self.gene_list:
-                            ax[i].axvline(int(end_), ls="--", color="#555555")
+                            ax.axvline(int(end_), ls="--", color="#555555")
                     else:
-                        ax[i].axvline(int(end_), ls="--", color="#555555")
-            plt.sca(ax[i])
-            plt.text(1.0, 0.5, self.bamTitle, transform=ax[i].transAxes,
+                        ax.axvline(int(end_), ls="--", color="#555555")
+            plt.sca(ax)
+            plt.text(1.0, 0.5, bamTitle, transform=ax.transAxes,
                 fontsize=12, va='center', ha='left')
+            ax.patch.set_alpha(0)
+            axes_index += 1
 
-        # set last xaxis
-        maxn = self.end
-        minn = self.start
-        for bam_data in self.bam_list:
-            if len(bam_data) == 0:
-                continue
+        if relative_pos:
+            # set last xaxis
+            maxn = self.end
+            minn = self.start
+            for bam_data in self.bam_list:
+                if len(bam_data) == 0:
+                    continue
 
-            minn_ = min(bam_data["start"])
-            maxn_ = max(bam_data["end"])
+                minn_ = min(bam_data["start"])
+                maxn_ = max(bam_data["end"])
 
-            if extend_xlim_start:
-                if self.strand == "+":
-                    minn = min(minn_, minn)
-                else:
-                    maxn = max(maxn_, maxn)
+                if extend_xlim_start:
+                    if self.strand == "+":
+                        minn = min(minn_, minn)
+                    else:
+                        maxn = max(maxn_, maxn)
 
-            if extend_xlim_end:
-                if self.strand == "+":
-                    maxn = max(maxn_, maxn)
-                else:
-                    minn = min(minn_, minn)
+                if extend_xlim_end:
+                    if self.strand == "+":
+                        maxn = max(maxn_, maxn)
+                    else:
+                        minn = min(minn_, minn)
 
-        if maxn - minn > 400:
-            step = (maxn - minn) // 400 * 100  # 坐标轴步长
+            if maxn - minn > 400:
+                step = (maxn - minn) // 400 * 100  # 坐标轴步长
+            else:
+                step = (maxn - minn) // 40 * 10
+
+            ax = axes[nrows - 1]
+            if self.strand == "+":
+                xticks = np.arange(minn, maxn + step, step)
+                ax.set_xticks(xticks)
+                ax.set_xticklabels(xticks - minn)
+                ax.set_xlim(minn, maxn)
+            else:
+                xticks = np.arange(maxn, minn - step, -step)
+                ax.set_xticks(xticks)
+                ax.set_xticklabels(maxn - xticks)
+                ax.set_xlim(minn, maxn)
+                ax.invert_xaxis()
+
         else:
-            step = (maxn - minn) // 40 * 10
-        if i == 0:
-            ax_ = ax
-        else:
-            ax_ = ax[i]
-        if self.strand == "+":
-            xticks = np.arange(minn, maxn + step, step)
-            ax_.set_xticks(xticks)
-            ax_.set_xticklabels(xticks - minn)
-            ax_.set_xlim(minn, maxn)
-        else:
-            xticks = np.arange(maxn, minn - step, -step)
-            ax_.set_xticks(xticks)
-            ax_.set_xticklabels(maxn - xticks)
-            ax_.set_xlim(minn, maxn)
-            ax_.invert_xaxis()
-        return ax
+            # plot genome coordinate
+            start = (self.start + 100_000) // 100_000 * 100_000
+            step = (self.end - start) // 3
+            step = step // 1000 * 1000
+            ax = axes[nrows - 1]
+            xticks = np.arange(start, self.end, step)
+            ax.set_xticks(xticks)
+            if start > 10_000:
+                ax.set_xticklabels(map(lambda x: f'{x:,d} kb', xticks//1000))
+            ax.set_xlim(self.start, self.end)
+
+        return axes

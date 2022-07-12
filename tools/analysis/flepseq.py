@@ -594,3 +594,95 @@ def count_rna_intermediates_turbo(
     rna_intermediates = pd.DataFrame(rna_intermediates, columns=['gene_id', 'readthrough', '5_cleavage', '3_cleavage'])
 
     return rna_intermediates
+
+
+def get_ir_ratio(infile: str, chrom: str, start: int, end: int, intron_id: str, strand: str):
+    '''
+    Counts the IR ratio for the given intron 
+    (only test for Araport11 annotation)
+    
+    Parameters
+    ----------
+    infile : str
+        the path to the BAM file
+    chrom : str
+        chromosome id
+    start : int
+        the start of the intron
+    end : int
+        the end of the intron
+    intron_id : str
+        the intron id, eg. AT1G01010.1_intron1
+    strand : str
+        "+" or "-"
+    '''
+    # infile = '/public/home/mowp/test/nanopore_test/20210324_col_nuclear/elongating_data/20210324_col_nuclear.elongating.bam'
+    if intron_id.startswith('TE-'):
+        # eg. TE-04844e9f-6b3f-4f3e-b4d0-435d42787293_intron1
+        # compatible for TE transcripts
+        gene_id = intron_id.split('_')[0]
+    else:
+        # eg. AT1G01010.1_intron1
+        gene_id = intron_id.split('.')[0]
+    intron_num = intron_id.split('intron')[1]
+
+    STRAND_TO_BOOL = {'-': True, '+': False}
+    totol_count, retain_count = 0, 0
+    with pysam.AlignmentFile(infile, 'rb') as inbam:
+        for read in inbam.fetch(chrom, start, end):
+            read_gene_id = read.get_tag('gi')
+            gene_strand = STRAND_TO_BOOL[strand]
+            if read.is_reverse == gene_strand and read_gene_id == gene_id:  # 判断read是否属于这个基因
+                if read.reference_start < start-10 and read.reference_end > end+10: # 判断read是否跨过这个intron
+                    totol_count += 1
+                    retain_intron_id = set(read.get_tag('ri').split(':'))
+                    if intron_num in retain_intron_id:
+                        retain_count += 1
+    if totol_count > 0:
+        return intron_id, totol_count, retain_count, retain_count/totol_count
+
+
+def get_ir_ratio_turbo(inbam: str, repr_intron: str, threads: int = 64):
+    '''This function takes a bam file and a bed file of introns and returns the intron retention ratio
+    
+    Parameters
+    ----------
+    inbam : str
+        the input bam file
+    repr_intron : str
+        a file containing the representative introns
+    threads : int, optional
+        number of threads to use
+    
+    '''
+
+    # repr_intron: mowp_scripts/pipelines/FLEP_seq_preprocessing_pipeline/ath_data/exon_intron_pos.repr.bed
+
+    repr_intron = np.array(repr_intron)
+    chrom = repr_intron[:, 0]
+    start = repr_intron[:, 1]
+    end = repr_intron[:, 2]
+    strand = repr_intron[:, 3]
+    intron_id = repr_intron[:, 4]
+
+    with ProcessPoolExecutor(max_workers=threads) as e:
+        chunksize = int(len(repr_intron) / threads)
+        results = e.map(
+            get_ir_ratio,
+            repeat(inbam),
+            chrom,
+            start,
+            end,
+            intron_id,
+            strand,
+            chunksize=chunksize
+        )
+    
+    ir_ratio = []
+    for res in results:
+        if res is not None:
+            ir_ratio.append(res)
+
+    ir_ratio = pd.DataFrame(ir_ratio, columns=['intron_id', 'totol_count', 'retain_count', 'IR_ratio'])
+    
+    return ir_ratio

@@ -13,6 +13,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.colors import Normalize
 from scipy.interpolate import interpn
+from matplotlib.patches import PathPatch
 
 
 def color_pal(key):
@@ -418,3 +419,50 @@ def karyotype(
         ax.set_xlabel('chromsome size')
 
     return ax
+
+
+
+def adjust_box_widths(g, fac):
+    '''Adjust the widths of a seaborn-generated boxplot.
+    
+    Parameters
+    ----------
+    g
+        the graph object
+        eg. g = plt.figure(figsize=(5, 3))
+    fac
+        the factor by which to adjust the width of the boxes
+    
+    Description
+    -----------
+        Adding space between boxes in grouped boxplot
+        https://github.com/mwaskom/seaborn/issues/1076
+    
+    '''
+    # iterating through Axes instances
+    for ax in g.axes:
+
+        # iterating through axes artists:
+        for c in ax.get_children():
+
+            # searching for PathPatches
+            if isinstance(c, PathPatch):
+                # getting current width of box:
+                p = c.get_path()
+                verts = p.vertices
+                verts_sub = verts[:-1]
+                xmin = np.min(verts_sub[:, 0])
+                xmax = np.max(verts_sub[:, 0])
+                xmid = 0.5*(xmin+xmax)
+                xhalf = 0.5*(xmax - xmin)
+
+                # setting new width of box
+                xmin_new = xmid-fac*xhalf
+                xmax_new = xmid+fac*xhalf
+                verts_sub[verts_sub[:, 0] == xmin, 0] = xmin_new
+                verts_sub[verts_sub[:, 0] == xmax, 0] = xmax_new
+
+                # setting new width of median line
+                for l in ax.lines:
+                    if np.all(l.get_xdata() == [xmin, xmax]):
+                        l.set_xdata([xmin_new, xmax_new])
