@@ -1,0 +1,5 @@
+sample: 20230307_human_cDNA_IVT_ATP_drs
+genome: /work/bio-mowp/db/hg38/dna/hg38.chr.fasta
+fastq_dir: guppy_out/pass
+fast5_dir: fast5
+sequencing_summary: guppy_out/sequencing_summary.txt

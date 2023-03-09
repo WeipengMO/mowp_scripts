@@ -1,0 +1,84 @@
+
+configfile: 'config.yml'
+sample=config['sample']
+
+rule all:
+    input:
+        expand("basecalled_data/{sample}.fastq.gz", sample=sample),
+        expand("tails/{sample}.polya_results.tsv", sample=sample),
+        expand('tails/{sample}.polya_len.png', sample=sample),
+
+rule make_fastq:
+    input:
+        fqd = config["fastq_dir"]  # guppy_out/pass
+    output:
+        fastq = "basecalled_data/{sample}.fastq.gz"
+    shell:
+        '''
+cat {input.fqd}/*.fastq | pigz -p 16 > {output.fastq}
+        '''
+
+
+rule map_reads:
+    input:
+        fastq = rules.make_fastq.output.fastq,
+    output:
+        bam = "aligned_data/{sample}.sorted.bam",
+        bai = "aligned_data/{sample}.sorted.bam.bai",
+    params:
+        ref = config["genome"]
+    threads: 16
+    shell:
+        """
+minimap2 -ax splice -uf -k14 -t {threads} {params.ref} {input.fastq}  | samtools sort -@ {threads} -o {output.bam};
+samtools index {output.bam}
+        """
+
+
+rule nanopolish_index:
+    input:
+        f5dir = config["fast5_dir"],  # fast5
+        fq = rules.make_fastq.output.fastq,
+        fofn = config['sequencing_summary']  # guppy_out/sequencing_summary.txt
+    output:
+        fastq_index = "basecalled_data/{sample}.fastq.gz.index",
+
+    shell:
+        """
+module load gcc/9.3.0
+export PATH=/work/bio-mowp/software/nanopolish:$PATH
+
+nanopolish index -d {input.f5dir} -s {input.fofn} {input.fq}
+        """
+
+
+rule call_tails:
+    input:
+        index = rules.nanopolish_index.output.fastq_index,
+        fastq = rules.make_fastq.output.fastq,
+        bam = rules.map_reads.output.bam,
+    output:
+        tails = "tails/{sample}.polya_results.tsv"
+    threads: 16
+    params: 
+        ref = config['genome']
+    shell:
+        """
+module load gcc/9.3.0
+export PATH=/work/bio-mowp/software/nanopolish:$PATH
+
+nanopolish polya -r {input.fastq} -b {input.bam} -g {params.ref} -t {threads} > {output.tails}
+        """
+
+
+rule filter_tails:
+    input:
+        tails = rules.call_tails.output.tails,
+    output:
+        polya = "tails/{sample}.polya_len.png",
+    params:
+        outprefix = "tails/{sample}",
+    shell:
+        """
+python scripts/tail_qc.py -i {input.tails} --outprefix {params.outprefix}
+        """
