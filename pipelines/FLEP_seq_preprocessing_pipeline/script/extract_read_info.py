@@ -249,7 +249,7 @@ def get_read_blocks(read):
             continue
         elif flag == 5:
             continue
-        elif flag == 0:
+        elif flag == 0 or flag == 7 or flag == 8:
             end += length
         elif flag == 1:
             continue

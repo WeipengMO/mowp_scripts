@@ -38,6 +38,7 @@ def bw_site_cov(
     before: int = 1000, after : int = 1000,
     bins: int = 100,
     chrom_prefix: str = '',
+    normalized: str = 'density',
     exclude_chr = None
     ):
     '''
@@ -92,7 +93,8 @@ def bw_site_cov(
     
     cov = np.nan_to_num(cov)
     if sum(cov) > 0:
-        cov = cov / sum(cov)  # density
+        if normalized == 'density':
+            cov = cov / sum(cov)  # density
         return cov
 
     
@@ -102,6 +104,7 @@ def bw_reference_point(
     before: int = 1000, after : int = 1000,
     bins: int = 100,
     chrom_prefix: str = '',
+    normalized: str = 'density',
     exclude_chr = None,
     threads=64):
     '''
@@ -134,6 +137,7 @@ def bw_reference_point(
             repeat(after),
             repeat(bins),
             repeat(chrom_prefix),
+            repeat(normalized),
             repeat(exclude_chr),
             chunksize=chunksize)
 

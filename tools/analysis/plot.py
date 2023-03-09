@@ -466,3 +466,20 @@ def adjust_box_widths(g, fac):
                 for l in ax.lines:
                     if np.all(l.get_xdata() == [xmin, xmax]):
                         l.set_xdata([xmin_new, xmax_new])
+
+
+def adjust_bar_widths(ax, new_value) :
+    '''
+    Adjust the widths of a seaborn-generated barplot.
+    
+    https://stackoverflow.com/questions/34888058/changing-width-of-bars-in-bar-chart-created-using-seaborn-factorplot
+    '''
+    for patch in ax.patches :
+        current_width = patch.get_width()
+        diff = current_width - new_value
+
+        # we change the bar width
+        patch.set_width(new_value)
+
+        # we recenter the bar
+        patch.set_x(patch.get_x() + diff * .5)
