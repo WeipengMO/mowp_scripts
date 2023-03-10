@@ -124,7 +124,7 @@ def plot_gene_model(
 
         for thick_pair in thick_list:
             thick = mp.Rectangle((thick_pair[0], y_pos-height), thick_pair[1]-thick_pair[0], height*2, color=gene_color, linewidth=0)
-            ax.add_patch(exon)
+            ax.add_patch(thick)
 
         # for exonstart, size in zip(blockStarts, blockSizes):
         #     if exonstart == chromStart and exonstart + size == chromEnd:
