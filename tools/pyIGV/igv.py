@@ -105,7 +105,7 @@ def plot_gene_model(
         ax.add_patch(line)
 
         # draw exons
-        cds_splits = [thickStart]
+        cds_split = [thickStart]
         for exonstart, size in zip(blockStarts, blockSizes):
             exon = mp.Rectangle(
                     (exonstart, y_pos - height / 2),
