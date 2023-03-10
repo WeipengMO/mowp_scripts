@@ -144,6 +144,13 @@ def plot_gene_model(
                 )
                 ax.add_patch(utr)
 
+            elif exonstart < thickStart and exonstart + size > thickEnd:
+                # cds surrounded by utrs
+                utr = mp.Rectangle((exonstart, y_pos-height/2), size, height, color=gene_color, linewidth=0)
+                exon = mp.Rectangle((thickStart, y_pos-height), thickEnd-thickStart, height*2, color=gene_color, linewidth=0)
+                ax.add_patch(utr)
+                ax.add_patch(exon)
+
             elif exonstart < thickStart and exonstart + size > thickStart:
                 # 带有5' / 3' UTR的exon
                 utr_size = thickStart - exonstart
