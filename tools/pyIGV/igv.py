@@ -104,107 +104,136 @@ def plot_gene_model(
         )  # 基因有多长这条线就有多长
         ax.add_patch(line)
 
+        # draw exons
+        cds_split = [thickStart]
         for exonstart, size in zip(blockStarts, blockSizes):
-            if exonstart == chromStart and exonstart + size == chromEnd:
-                utr_size = thickStart - chromStart
-                utr = mp.Rectangle(
-                    (exonstart, y_pos - height / 2),
-                    utr_size,
-                    height,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(utr)
-                utr_size = chromEnd - thickEnd
-                utr = mp.Rectangle(
-                    (thickEnd, y_pos - height / 2),
-                    utr_size,
-                    height,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(utr)
-                exon = mp.Rectangle(
-                    (thickStart, y_pos - height),
-                    thickEnd - thickStart,
-                    height * 2,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(exon)
-
-            elif exonstart + size <= thickStart:
-                # 只有5'/ 3'UTR
-                utr = mp.Rectangle(
+            exon = mp.Rectangle(
                     (exonstart, y_pos - height / 2),
                     size,
                     height,
                     color=gene_color,
                     linewidth=0,
                 )
-                ax.add_patch(utr)
+            ax.add_patch(exon)
+            for exon_edge in [exonstart, exonstart + size]:
+                if thickStart < exon_edge and exon_edge < thickEnd:
+                    cds_split.append(exon_edge)
+        cds_split.append(thickEnd)
 
-            elif exonstart < thickStart and exonstart + size > thickStart:
-                # 带有5' / 3' UTR的exon
-                utr_size = thickStart - exonstart
-                utr = mp.Rectangle(
-                    (exonstart, y_pos - height / 2),
-                    utr_size,
-                    height,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                exon = mp.Rectangle(
-                    (exonstart + utr_size, y_pos - height),
-                    size - utr_size,
-                    height * 2,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(utr)
-                ax.add_patch(exon)
+        thick_list = [(cds_split[i], cds_split[i+1]) for i in range(0, len(cds_split), 2)]
 
-            elif exonstart >= thickStart and exonstart + size <= thickEnd:
-                # 普通exon
-                exon = mp.Rectangle(
-                    (exonstart, y_pos - height),
-                    size,
-                    height * 2,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(exon)
+        for thick_pair in thick_list:
+            thick = mp.Rectangle((thick_pair[0], y_pos-height), thick_pair[1]-thick_pair[0], height*2, color=gene_color, linewidth=0)
+            ax.add_patch(thick)
 
-            elif exonstart < thickEnd and exonstart + size > thickEnd:
-                # 带有3' / 5' UTR的exon
-                utr_size = exonstart + size - thickEnd
-                utr = mp.Rectangle(
-                    (thickEnd, y_pos - height / 2),
-                    utr_size,
-                    height,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                exon = mp.Rectangle(
-                    (exonstart, y_pos - height),
-                    size - utr_size,
-                    height * 2,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(utr)
-                ax.add_patch(exon)
+        # for exonstart, size in zip(blockStarts, blockSizes):
+        #     if exonstart == chromStart and exonstart + size == chromEnd:
+        #         utr_size = thickStart - chromStart
+        #         utr = mp.Rectangle(
+        #             (exonstart, y_pos - height / 2),
+        #             utr_size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
+        #         utr_size = chromEnd - thickEnd
+        #         utr = mp.Rectangle(
+        #             (thickEnd, y_pos - height / 2),
+        #             utr_size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
+        #         exon = mp.Rectangle(
+        #             (thickStart, y_pos - height),
+        #             thickEnd - thickStart,
+        #             height * 2,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(exon)
 
-            elif exonstart >= thickEnd:
-                # 只有3'/ 5'UTR
-                utr = mp.Rectangle(
-                    (exonstart, y_pos - height / 2),
-                    size,
-                    height,
-                    color=gene_color,
-                    linewidth=0,
-                )
-                ax.add_patch(utr)
+        #     elif exonstart + size <= thickStart:
+        #         # 只有5'/ 3'UTR
+        #         utr = mp.Rectangle(
+        #             (exonstart, y_pos - height / 2),
+        #             size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
+
+        #     elif exonstart < thickStart and exonstart + size > thickEnd:
+        #         # cds surrounded by utrs
+        #         utr = mp.Rectangle((exonstart, y_pos-height/2), size, height, color=gene_color, linewidth=0)
+        #         exon = mp.Rectangle((thickStart, y_pos-height), thickEnd-thickStart, height*2, color=gene_color, linewidth=0)
+        #         ax.add_patch(utr)
+        #         ax.add_patch(exon)
+
+        #     elif exonstart < thickStart and exonstart + size > thickStart:
+        #         # 带有5' / 3' UTR的exon
+        #         utr_size = thickStart - exonstart
+        #         utr = mp.Rectangle(
+        #             (exonstart, y_pos - height / 2),
+        #             utr_size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         exon = mp.Rectangle(
+        #             (exonstart + utr_size, y_pos - height),
+        #             size - utr_size,
+        #             height * 2,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
+        #         ax.add_patch(exon)
+
+        #     elif exonstart >= thickStart and exonstart + size <= thickEnd:
+        #         # 普通exon
+        #         exon = mp.Rectangle(
+        #             (exonstart, y_pos - height),
+        #             size,
+        #             height * 2,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(exon)
+
+        #     elif exonstart < thickEnd and exonstart + size > thickEnd:
+        #         # 带有3' / 5' UTR的exon
+        #         utr_size = exonstart + size - thickEnd
+        #         utr = mp.Rectangle(
+        #             (thickEnd, y_pos - height / 2),
+        #             utr_size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         exon = mp.Rectangle(
+        #             (exonstart, y_pos - height),
+        #             size - utr_size,
+        #             height * 2,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
+        #         ax.add_patch(exon)
+
+        #     elif exonstart >= thickEnd:
+        #         # 只有3'/ 5'UTR
+        #         utr = mp.Rectangle(
+        #             (exonstart, y_pos - height / 2),
+        #             size,
+        #             height,
+        #             color=gene_color,
+        #             linewidth=0,
+        #         )
+        #         ax.add_patch(utr)
 
         if plot_gene_id:
             ax.annotate(
