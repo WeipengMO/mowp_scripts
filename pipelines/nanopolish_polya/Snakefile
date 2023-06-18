@@ -1,3 +1,9 @@
+'''
+Author: 
+    windz
+Usage:
+    snakemake --profile lsf  # work for taiyi
+'''
 
 configfile: 'config.yml'
 sample=config['sample']
