@@ -5,3 +5,4 @@ sample: ['col0_wgbs']
 
 genome: /public/home/mowp/db/Arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa
 gsize: /public/home/mowp/db/Arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.chrom.sizes
+bismark_genome: /data/Zhaijx/mowp/db/col-PEK/dna/bismark

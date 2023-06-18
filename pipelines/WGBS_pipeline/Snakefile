@@ -21,6 +21,12 @@ include:
 include:
     'snakemake/methylation_ratio.smk'
 
+include:
+    'snakemake/bamCoverage.smk'
+
+include:
+    'snakemake/bismark_downstream.smk'
+
 # create log dir
 if not os.path.exists('log'):
     os.makedirs('log', exist_ok=True)
@@ -39,6 +45,11 @@ onerror:
 
 rule all:
     input:
-        expand('aligned_data/{sample}.bam', sample=sample),
+        # expand('aligned_data/{sample}.bam', sample=sample),
         expand('methratio/{sample}_methratio.txt.gz', sample=sample),
         expand('bw_files/{sample}.methratio.{meth_type}.bw', sample=sample, meth_type=meth_type),
+        expand('bw_coverage/{sample}.{strand}.bw', sample=sample, strand=['forward','reverse']),
+
+        expand('bismark_aligned_data/bw_coverage/{sample_name}_bismark_bt2.deduplicated.bw', sample_name=sample),
+        expand('bismark_aligned_data/bw_methy/{sample_name}_{methy_type}.bw', sample_name=sample, methy_type=['CpG', 'CHG', 'CHH']),
+        expand('bismark_aligned_data/bw_coverage/{sample_name}.{strand}.bw', sample_name=sample, strand=['forward','reverse']),

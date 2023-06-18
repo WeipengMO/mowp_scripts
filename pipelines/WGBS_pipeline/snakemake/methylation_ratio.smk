@@ -6,7 +6,8 @@ rule extract_methratio:
         out1=temp("methratio/{sample_name}_methratio.txt"),
         out2=temp("methratio/{sample_name}_wiggle.txt"),
         out3="methratio/{sample_name}_methratio.txt.gz",
-        out4="methratio/{sample_name}_wiggle.txt.gz"
+        out4="methratio/{sample_name}_wiggle.txt.gz",
+        sorted_bam='aligned_data/{sample_name}.tmpSrt.bam',
     params:
         genome=config['genome'],
         wig_bin=1,
