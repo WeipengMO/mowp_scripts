@@ -1,44 +1,30 @@
-'''
-Date         : 2021-09-02 18:15:05
-LastEditTime : 2021-09-02 18:35:02
-LastEditors  : windz
-Notes        : tell snakemake to allow ambiguity via
-               --allow-ambiguity
-'''
-# snakefile for 4DN_project_hic
-# Adapted from Zhuowen
-
-# create log dir
-if not os.path.exists('log'):
-    os.mkdir('log')
+from glob import glob
+import os
 
 configfile:'config.yaml'
 
-sample=config['sample']
-mapq=config['mapq']
 resolution=config['resolution']
+sample = [os.path.basename(i).split('_R1')[0] for i in glob('raw_data/*_R1.fq.gz')]
 
-ruleorder: 
-    pair_dropdu > pair_sort > pair_parse
 
-onsuccess:
-    shell("send.py log -l {log}")
+# onsuccess:
+#     shell("send.py log -l {log}")
 
-onerror:
-    shell("send.py log -l {log} --return_code 1")
+# onerror:
+#     shell("send.py log -l {log} --return_code 1")
 
 rule all:
     input:
-        expand('{SAMPLE}.hic.q{MAPQ}.resolution_{RESOLUTION}.mcool', SAMPLE=sample, MAPQ=mapq, RESOLUTION=resolution)
+        expand('cool_files/{SAMPLE}.resolution_{RESOLUTION}.mcool', SAMPLE=sample, RESOLUTION=resolution)
 
 
 rule run_bwa:
     input:
-        fastq1='raw_data/{sample}_1.fastq.gz',
-        fastq2='raw_data/{sample}_2.fastq.gz',
+        fastq1='raw_data/{sample}_R1.fq.gz',
+        fastq2='raw_data/{sample}_R2.fq.gz',
     output: 
-        '{sample}.hic.bam'
-    threads: 58
+        'aligned_data/{sample}.bam'
+    threads: 30
     params:
         ref=config['bwa_index']
     shell:
@@ -47,89 +33,104 @@ rule run_bwa:
 
 rule pair_parse:
     input: 
-        bam='{sample}.hic.bam',
+        bam='aligned_data/{sample}.bam',
     output:
-        temp("{sample}.hic.q{MAPQ}.pairsam")
+        temp("pairs_files/{sample}.pairs")
     params:
         genomesize=config['genomesize'],
-        mapq = lambda wildcard: wildcard.MAPQ
+        mapq=config['mapq']
+    conda: 'hic'
     threads: 32
     shell:
         """
-export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
-pairsamtools parse --nproc-in {threads} --nproc-out {threads} --min-mapq {params.mapq} {input.bam} -c {params.genomesize} > {output}
+pairtools parse --nproc-in {threads} --nproc-out {threads} --min-mapq {params.mapq} --drop-sam --drop-seq -c {params.genomesize} -o {output} {input.bam}
         """        
 
 
 rule pair_sort:
     input:
-        rules.pair_parse.output
+        'pairs_files/{sample}.pairs'
     output:
-        temp('{sample}.hic.q{MAPQ}.sorted.pairsam')
+        temp('pairs_files/{sample}.sorted.pairs')
     threads: 32
+    conda: 'hic'
     shell:
         """
-export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
-pairsamtools sort --nproc-in {threads} --nproc-out {threads} --memory 64G --tmpdir ./ {input} -o {output}
+pairtools sort --nproc-in {threads} --nproc-out {threads} --memory 96G --tmpdir ./ -o {output} {input} 
         """
 
 
 #this step only keep UU UR RU 
 rule pair_dropdu: 
     input:
-        rules.pair_sort.output
+        'pairs_files/{sample}.sorted.pairs'
     output:
-        temp("{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam")
+        nodups_pairs='pairs_files/{sample}.nodups.pairs.gz',
+        nodups_bam='aligned_data/{sample}.nodups.bam',
+        unmapped_pairs='pairs_files/{sample}.unmapped.pairs.gz',
+        unmapped_bam='aligned_data/{sample}.unmapped.bam',
+        dups_pairs='pairs_files/{sample}.dups.pairs.gz',
+        dups_bam='aligned_data/{sample}.dups.bam',
+        stats='stats/{sample}.dedup.stats'
+    conda: 'hic'
     threads: 32
     shell:
         """
-export PATH=/public/home/lizw/anaconda3/envs/pairsamtools/bin/:$PATH
-pairsamtools dedup --nproc-in {threads} --nproc-out {threads} -o {output} {input}
+pairtools dedup --n-proc {threads} --nproc-in {threads} --nproc-out {threads} \
+    --output \
+        >( pairtools split \
+            --output-pairs {output.nodups_pairs} \
+            --output-sam {output.nodups_bam} \
+         ) \
+    --output-unmapped \
+        >( pairtools split \
+            --output-pairs {output.unmapped_pairs} \
+            --output-sam {output.unmapped_bam} \
+         ) \
+    --output-dups \
+        >( pairtools split \
+            --output-pairs {output.dups_pairs} \
+            --output-sam {output.dups_bam} \
+         ) \
+    --output-stats {output.stats} \
+    {input}
         """
-
-
-rule bgzip:
-    input:
-        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam"
-    output:
-        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz"
-    threads: 1
-    shell:
-        "bgzip {input}"
 
 
 rule pairix:
     input:
-        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz"
+        "pairs_files/{sample}.nodups.pairs.gz"
     output:
-        "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz.px2"
+        "pairs_files/{sample}.nodups.pairs.gz.px2"
+    conda: 'hic'
     shell:
         """
-export PATH=/public/home/lizw/anaconda3/envs/pairix/bin:$PATH
 pairix -f -p pairs {input}
         """
 
         
 rule cooler:
     output:
-        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.cool"
+        "cool_files/{sample}.resolution_{RESOLUTION}.cool"
     input:
-        pairsam = "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz",
-        px = "{sample}.hic.q{MAPQ}.sorted.rmdup.pairsam.gz.px2"
+        pairsam = "pairs_files/{sample}.nodups.pairs.gz",
+        px = "pairs_files/{sample}.nodups.pairs.gz.px2"
     params:
         chromsize = config['genomesize'],
         resulation = lambda wildcard: wildcard.RESOLUTION
-    threads: 1
+    conda: 'hic'
     shell:
         "cooler cload pairix {params.chromsize}:{params.resulation} {input.pairsam} {output}"
 
 
 rule balance:
     output:
-        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.mcool"
+        "cool_files/{sample}.resolution_{RESOLUTION}.mcool"
     input:
-        "{sample}.hic.q{MAPQ}.resolution_{RESOLUTION}.cool"
+        "cool_files/{sample}.resolution_{RESOLUTION}.cool"
     params:
         mcool_resulation = config['mcool_resulation']  # for cooler zoomify 
+    threads: 16
+    conda: 'hic'
     shell:
-        "cooler zoomify -r {params.mcool_resulation} --balance --balance-args --convergence-policy=store_nan --balance-args --max-iters=10000 -o {output} {input}"
+        "cooler zoomify --nproc {threads} -r {params.mcool_resulation} --balance -o {output} {input}"
