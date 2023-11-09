@@ -2,6 +2,7 @@ import scanpy as sc
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from ..utils import rtools
+from loguru import logger
 
 
 def remove_ambient(
@@ -21,7 +22,7 @@ def remove_ambient(
     SoupX = importr('SoupX')
     assert (adata.var.index == adata_raw.var.index).all(), 'The order of genes in the raw and filtered matrices must be the same'
 
-
+    logger.info("Preprocessing data for SoupX")
     # normalize and log1p transform it
     adata_pp = adata.copy()
     sc.pp.normalize_per_cell(adata_pp)
@@ -46,6 +47,7 @@ def remove_ambient(
     del adata_raw
 
     # Run SoupX
+    logger.info("Running SoupX")
     with ro.local_context() as rEnv:
         rEnv['data'] = rtools.py2r(data)
         rEnv['data_tod'] = rtools.py2r(data_tod)
@@ -82,4 +84,4 @@ def remove_ambient(
         adata.X = adata.layers["soupX_counts"]
 
         if soupX_ambient_frac:
-            adata.obs['soupX_ambient_frac'] = 1 - (adata.layers['soupX_counts'].sum(1).A.reshape(-1) / adata.layers['raw'].sum(1).A.reshape(-1))
+            adata.obs['soupX_ambient_frac'] = 1 - (adata.layers['soupX_counts'].sum(1).A.reshape(-1) / adata.layers['counts'].sum(1).A.reshape(-1))

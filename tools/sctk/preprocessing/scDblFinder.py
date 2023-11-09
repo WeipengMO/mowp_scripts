@@ -89,10 +89,9 @@ def scDblFinder(
             logger.info(f"Before dropping: {len(adata)}")
             adata = adata[adata.obs['scDblFinder_class'] == 'singlet'].copy()
             logger.info(f"After dropping: {len(adata)}")
-
-            return adata
         else:
             doublet_info = adata.obs.scDblFinder_class.value_counts().to_dict()
             logger.info(', '.join(f'{k}: {v}' for k, v in doublet_info.items()))
             logger.info(f"Anndata still contains doublets")
         
+        return adata

@@ -75,16 +75,19 @@ def layer_pp(adata, layer=None, total=1e4, logbase=10, scale=False):
     scale : bool, optional
         Whether to scale the data. The default is False.
     """
-
-    adata.layers['raw'] = adata.X.copy() if layer == None else adata.layers[layer].copy()
-    adata.layers['normalize_log'] = adata.layers['raw'].copy()
-    sc.pp.normalize_total(adata, total, layer='normalize_log')
-    sc.pp.log1p(adata, layer='normalize_log', base=logbase)
+    if 'counts' not in adata.layers:
+        adata.layers['counts'] = adata.X.copy() if layer == None else adata.layers[layer].copy()
+    else:
+        logger.info('adata.layers["counts"] already exists')
+        
+    adata.layers['log1p_norm'] = adata.layers['counts'].copy()
+    sc.pp.normalize_total(adata, total, layer='log1p_norm')
+    sc.pp.log1p(adata, layer='log1p_norm', base=logbase)
     if scale:
-        adata.layers['normalize_log_scale'] = adata.layers['normalize_log'].copy()
-        sc.pp.scale(adata, layer='normalize_log_scale')
+        adata.layers['scale'] = adata.layers['log1p_norm'].copy()
+        sc.pp.scale(adata, layer='scale')
 
-    adata.X = adata.layers['normalize_log'].copy()
+    adata.X = adata.layers['log1p_norm'].copy()
 
 
 def simplify_adata(
@@ -153,3 +156,33 @@ def simplify_adata(
         assert False, f"unsupported layers data type: {type(layers)}"
 
     return subAd.copy()
+
+
+def get_adata_color(adata, label):
+    if f"{label}_colors" not in adata.uns:
+        set_adata_color(adata, label)
+    return {
+        x: y
+        for x, y in zip(adata.obs[label].cat.categories, adata.uns[f"{label}_colors"])
+    }
+
+
+def set_adata_color(adata, label, color_dict=None, hex=True):
+    adata.obs[label] = adata.obs[label].astype("category")
+    if color_dict:
+        if not hex:
+            from matplotlib.colors import to_hex
+
+            color_dict = {x: to_hex(y) for x, y in color_dict.items()}
+
+        _dt = get_adata_color(adata, label)
+        _dt.update(color_dict)
+        color_dict = _dt
+        adata.uns[f"{label}_colors"] = [
+            color_dict[x] for x in adata.obs[label].cat.categories
+        ]
+    else:
+        if f"{label}_colors" not in adata.uns:
+            sc.pl._utils._set_default_colors_for_categorical_obs(adata, label)
+
+    return adata
