@@ -607,6 +607,77 @@ def so2md(so, rEnv=None, verbose=0, **kwargs):
     return md
 
 
+@rcontext
+def ad2cds(adata, layer: str = 'counts', rEnv=None, verbose=0, **kwargs):
+    """Convert an AnnData object to a CellDataSet object
+
+    https://github.com/satijalab/seurat/issues/2833
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        the layer to use for the count slot.
+    rEnv
+        R environment to use. If None, then a new one is created.
+
+    Returns
+    -------
+    CellDataSet
+        CellDataSet object for Monocle3
+    """
+    assert layer in adata.layers, f'{layer} not in adata.layers'
+
+    monocle3 = importr('monocle3')
+
+    gene_annotation = adata.var.copy()
+    gene_annotation['gene_short_name'] = gene_annotation.index
+    gene_annotation = gene_annotation[['gene_short_name']]
+
+    cell_metadata = adata.obs.copy()
+    cell_metadata['barcode'] = cell_metadata.index
+    cell_metadata = cell_metadata[['barcode']]
+
+    expression_matrix = adata.layers[layer].T
+    cell_type = adata.obs['cell_type'].values
+    umap = pd.DataFrame(adata.obsm['X_umap'], columns=['UMAP_1', 'UMAP_2'], index=adata.obs.index)
+    pca = pd.DataFrame(
+        adata.obsm['X_pca'], 
+        columns=[f'PC{i}' for i in range(1, adata.obsm['X_pca'].shape[1]+1)], index=adata.obs.index)
+
+    rEnv['cell_metadata'] = py2r(cell_metadata)
+    rEnv['gene_annotation'] = py2r(gene_annotation)
+    rEnv['expression_matrix'] = py2r(expression_matrix)
+    rEnv['cell_type'] = py2r(cell_type)
+    rEnv['umap'] = py2r(umap)
+    rEnv['pca'] = py2r(pca)
+
+    ro.r(
+        """
+        cds_from_seurat <- new_cell_data_set(
+            expression_matrix,
+            cell_metadata = cell_metadata,
+            gene_metadata = gene_annotation)
+        
+        recreate.partition <- c(rep(1, length(cds_from_seurat@colData@rownames)))
+        names(recreate.partition) <- cds_from_seurat@colData@rownames
+        recreate.partition <- as.factor(recreate.partition)
+        cds_from_seurat@clusters@listData[["UMAP"]][["partitions"]] <- recreate.partition
+
+        list_cluster <- cell_type
+
+        names(list_cluster) <- cds_from_seurat@colData@rownames
+        cds_from_seurat@clusters@listData[["UMAP"]][["clusters"]] <- list_cluster
+        cds_from_seurat@clusters@listData[["UMAP"]][["louvain_res"]] <- "NA"
+        cds_from_seurat@int_colData@listData$reducedDims@listData[["UMAP"]] <- umap
+        cds_from_seurat@reduce_dim_aux$gene_loadings <- pca
+        """
+    )
+
+    return rEnv['cds_from_seurat']
+
+
 @contextmanager
 def r_inline_plot(width=500, height=500, dpi=100):
 
