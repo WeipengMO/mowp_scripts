@@ -57,7 +57,7 @@ def remove_ambient(
         
         ro.r(
             '''
-            set.seed(1)
+            set.seed(0)
             # specify row and column names of data
             rownames(data) = genes
             colnames(data) = cells

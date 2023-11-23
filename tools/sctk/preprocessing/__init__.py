@@ -7,3 +7,4 @@ from .scDblFinder import scDblFinder
 from .qc import is_outlier
 from .clustering import leiden_iter, clustree
 from .adata_process import scanpy_pp, layer_pp
+from .batch_correct import harmony_integrate

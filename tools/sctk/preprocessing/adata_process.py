@@ -1,8 +1,9 @@
 import scanpy as sc
 import anndata
 from loguru import logger
-from typing import Optional, Union, Sequence, List
+from typing import Optional, Union, Sequence, List, Iterator, Literal
 import numpy as np
+from tqdm import tqdm
 
 
 def scanpy_pp(adata, n_top_genes=2000, n_pcs=50, n_neighbors=15, resolution=0.5, seed=1, inplace=True):
@@ -43,6 +44,7 @@ def scanpy_pp(adata, n_top_genes=2000, n_pcs=50, n_neighbors=15, resolution=0.5,
     if not inplace:
         adata = adata.copy()
 
+    adata.layers['counts'] = adata.X.copy()
     sc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=n_top_genes)
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -186,3 +188,64 @@ def set_adata_color(adata, label, color_dict=None, hex=True):
             sc.pl._utils._set_default_colors_for_categorical_obs(adata, label)
 
     return adata
+
+
+def split_adata(
+    adata: anndata.AnnData,
+    batchKey: str,
+    copy=True,
+    axis: Literal[0, "cell", 1, "feature"] = 0,
+    needName=False,
+    disableBar=False
+) -> Iterator[anndata.AnnData]:
+    if axis in [0, "cell"]:
+        assert batchKey in adata.obs.columns, f"{batchKey} not detected in adata"
+        indexName = "index" if (not adata.obs.index.name) else adata.obs.index.name
+        adata.obs["__group"] = adata.obs[batchKey]
+        batchObsLs = (
+            adata.obs.filter(["__group"])
+            .reset_index()
+            .groupby("__group")[indexName]
+            .agg(list)
+        )
+        for batchObs in tqdm(batchObsLs, disable=disableBar):
+            if needName:
+                if copy:
+                    yield adata[batchObs].obs.iloc[0].loc["__group"], adata[
+                        batchObs
+                    ].copy()
+                else:
+                    yield adata[batchObs].obs.iloc[0].loc["__group"], adata[batchObs]
+            else:
+                if copy:
+                    yield adata[batchObs].copy()
+                else:
+                    yield adata[batchObs]
+
+    elif axis in [1, "feature"]:
+        assert batchKey in adata.var.columns, f"{batchKey} not detected in adata"
+        indexName = "index" if (not adata.var.index.name) else adata.var.index.name
+        adata.var["__group"] = adata.var[batchKey]
+        batchVarLs = (
+            adata.var.filter(["__group"])
+            .reset_index()
+            .groupby("__group")[indexName]
+            .agg(list)
+        )
+        del adata.var["__group"]
+        for batchVar in tqdm(batchVarLs, disable=disableBar):
+            if needName:
+                if copy:
+                    yield adata[batchVar].var.iloc[0].loc["__group"], adata[
+                        batchVar
+                    ].copy()
+                else:
+                    yield adata[batchVar].var.iloc[0].loc["__group"], adata[batchVar]
+            else:
+                if copy:
+                    yield adata[:, batchVar].copy()
+                else:
+                    yield adata[:, batchVar]
+
+    else:
+        assert False, "Unknown `axis` parameter"

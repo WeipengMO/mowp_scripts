@@ -64,7 +64,7 @@ def scDblFinder(
 
         ro.r(
             '''
-            set.seed(1)
+            set.seed(0)
 
             sce <- SingleCellExperiment(assays = list(counts = data_mat), colData = colData)
 
