@@ -83,7 +83,7 @@ def AUCell_r(
 
     R(
         """
-        set.seed(1)
+        set.seed(0)
         BPPARAM=BiocParallel::MulticoreParam(n_jobs)
         rownames(mtxR) <- var_keys
         colnames(mtxR) <- obs_keys

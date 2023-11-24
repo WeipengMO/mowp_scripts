@@ -1,4 +1,4 @@
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import scanpy as sc
 import numpy as np
 import rpy2.robjects as ro

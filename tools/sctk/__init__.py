@@ -7,3 +7,6 @@ from . import pp
 from . import tl
 from . import pl
 from . import sample_data
+from .utils import settings
+
+settings.set_seed()

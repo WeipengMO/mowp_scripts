@@ -87,3 +87,21 @@ def lung_atlas() -> ad.AnnData:
     )
 
     return adata
+
+
+@check_datasetdir_exists
+def kang_counts_25k() -> ad.AnnData:
+    """\
+    25K PBMC data, this dataset contains untreated and IFN-stimulated human PBMC cells
+    https://www.sc-best-practices.org/conditions/gsea_pathway.htm
+
+    """
+    filename = f'{datasetdir}/kang_counts_25k.h5ad'
+    url = "https://figshare.com/ndownloader/files/34464122"
+
+    adata = sc.read(
+        filename=filename,
+        backup_url=url,
+    )
+
+    return adata

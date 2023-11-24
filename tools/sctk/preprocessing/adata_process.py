@@ -3,7 +3,7 @@ import anndata
 from loguru import logger
 from typing import Optional, Union, Sequence, List, Iterator, Literal
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def scanpy_pp(adata, n_top_genes=2000, n_pcs=50, n_neighbors=15, resolution=0.5, seed=1, inplace=True):
