@@ -14,6 +14,7 @@ def percent_in_cluster(
     plot_legend=True,
     legend_kwargs={"bbox_to_anchor": [1, 1]},
     swapAxes=False,
+    sort_index=False,
 ):
     """
     Plot the percentage of each label in each groupby category.
@@ -38,6 +39,8 @@ def percent_in_cluster(
         The keyword arguments for the legend.
     swapAxes
         Whether to swap the x-axis and y-axis.
+    sort_index
+        Whether to sort the index.
 
     Returns
     -------
@@ -53,6 +56,11 @@ def percent_in_cluster(
     groupbyWithLabelCountsDf = (
         adata.obs.groupby(groupby)[label].apply(lambda x: x.value_counts()).unstack()
     )
+
+    if sort_index:
+        index = sorted(groupbyWithLabelCountsDf.index)
+        groupbyWithLabelCountsDf = groupbyWithLabelCountsDf.reindex(index)
+    
     groupbyWithLabelCounts_CumsumPercDf = groupbyWithLabelCountsDf.pipe(
         lambda x: x.cumsum(1).div(x.sum(1), 0) * 100
     )

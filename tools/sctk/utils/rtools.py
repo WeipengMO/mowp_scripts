@@ -650,8 +650,8 @@ def ad2cds(adata, layer: str = 'counts', rEnv=None, verbose=0, **kwargs):
     rEnv['gene_annotation'] = py2r(gene_annotation)
     rEnv['expression_matrix'] = py2r(expression_matrix)
     rEnv['cell_type'] = py2r(cell_type)
-    rEnv['umap'] = py2r(umap)
-    rEnv['pca'] = py2r(pca)
+    rEnv['umap'] = ro.r['as.matrix'](py2r(umap))
+    rEnv['pca'] = ro.r['as.matrix'](py2r(pca))
 
     ro.r(
         """
@@ -671,7 +671,7 @@ def ad2cds(adata, layer: str = 'counts', rEnv=None, verbose=0, **kwargs):
         cds_from_seurat@clusters@listData[["UMAP"]][["clusters"]] <- list_cluster
         cds_from_seurat@clusters@listData[["UMAP"]][["louvain_res"]] <- "NA"
         cds_from_seurat@int_colData@listData$reducedDims@listData[["UMAP"]] <- umap
-        cds_from_seurat@reduce_dim_aux$gene_loadings <- pca
+        cds_from_seurat@int_colData@listData$reducedDims@listData[["PCA"]] <- pca
         """
     )
 
