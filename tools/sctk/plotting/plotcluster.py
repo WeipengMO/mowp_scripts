@@ -134,3 +134,83 @@ def percent_in_cluster(
     ax.spines["top"].set_visible(False)
 
     return ax
+
+
+def percent_in_cluster_group(
+        adata, 
+        groupby: str, 
+        label: str, 
+        group_dict: dict, 
+        figsize: tuple = (8, 3),
+        sort_index: bool = True):
+
+    """
+    Plot the percentage of each label in each groupby category.
+
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    groupby
+        The column name of the category. eg. 'batch'
+    label
+        The column name of the label. eg. 'cell_type'
+    group_dict
+        A dictionary with group name as key and group list as value. eg. {'group1': ['label1', 'label2'], 'group2': ['label3', 'label4']}
+    figsize
+        The figure size.
+    sort_index
+        Whether to sort the index.
+    
+    Examples
+    --------
+    >>> cd45_pos = [
+            'B cells', 'NK cells', 'T cells', 'TAM', 'macrophages', 'mast cells',
+            'neutrophils', 'pDCs', 'plasma cells']
+        cd45_neg = [
+            'endothelial cells', 'fibroblasts', 'maligant cells']
+        group_dict = {
+            'CD45+': cd45_pos,
+            'CD45-': cd45_neg}
+    >>> sctk.pl.percent_in_cluster_group(adata, 'batch', 'cell_type', group_dict)
+    """
+
+    assert len(group_dict) == 2, 'group_dict must have 2 groups'
+    
+    # A dataframe with groupby as index and label as columns, values are counts
+    groupby_label_counts_df = (
+        adata.obs.groupby(groupby)[label].apply(lambda x: x.value_counts()).unstack()
+    )
+
+    label_color = f'{label}_colors'
+    if label_color in adata.uns:
+        # get the same color set from adata.uns
+        label_color = dict(zip(adata.obs[label].cat.categories, adata.uns[label_color]))
+    else:
+        label_color = None
+
+    if sort_index:
+        index = sorted(groupby_label_counts_df.index)[::-1]
+        groupby_label_counts_df = groupby_label_counts_df.reindex(index)
+
+    fig, ax = plt.subplots(1, 2, figsize=figsize, sharey=True)
+
+    for i, group_name in enumerate(group_dict):
+        _group = group_dict[group_name]
+        color = [label_color[x] for x in _group]
+        
+        data = groupby_label_counts_df.loc[:, _group]
+        data_percentage = data.div(data.sum(axis=1), axis=0) * 100
+        data_percentage.plot(kind='barh', stacked=True, ax=ax[i], legend=True, color=color)
+        
+        ax[i].set_title(group_name)
+        ax[i].set_ylabel('')
+        ax[i].set_xlim(0, 100)
+        ax[i].grid(False)
+        ax[i].legend(loc='upper left', bbox_to_anchor=(0, -.2), ncol=2, frameon=False)
+
+    fig.text(0.5, -.01, 'Percentage of cells', ha='center')
+
+    plt.subplots_adjust(wspace=.1)
+    
+    return ax
