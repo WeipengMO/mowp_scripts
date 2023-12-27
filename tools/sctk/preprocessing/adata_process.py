@@ -78,11 +78,12 @@ def layer_pp(adata, layer=None, total=1e4, logbase=10, scale=False):
         Whether to scale the data. The default is False.
     """
     if 'counts' not in adata.layers:
-        adata.layers['counts'] = adata.X.copy() if layer == None else adata.layers[layer].copy()
+        if layer is None:
+            adata.layers['counts'] = adata.X.copy()
     else:
         logger.info('adata.layers["counts"] already exists')
         
-    adata.layers['log1p_norm'] = adata.layers['counts'].copy()
+    adata.layers['log1p_norm'] = adata.layers[layer].copy()
     sc.pp.normalize_total(adata, total, layer='log1p_norm')
     sc.pp.log1p(adata, layer='log1p_norm', base=logbase)
     if scale:
