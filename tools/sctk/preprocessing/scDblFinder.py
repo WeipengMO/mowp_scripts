@@ -33,13 +33,6 @@ def scDblFinder(
     >>> sctk.pp.scDblFinder(adata)
     
     """
-def scDblFinder(
-    adata: sc.AnnData,
-    batch_key: str = None,
-    dbr: int = None,
-    n_jobs: int = 4,
-    drop_doublet: bool = True,
-):
 
     scDblFinder = importr('scDblFinder')
     BiocParallel = importr('BiocParallel')
