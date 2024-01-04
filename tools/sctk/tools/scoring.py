@@ -2,8 +2,11 @@ from math import ceil
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 import scipy.sparse as ss
-from ..utils.rtools import r2py, py2r, r_inline_plot
+from ..utils import rtools
+from ..utils.rtools import r2py, py2r, r_inline_plot, rcontext
 import pandas as pd
+import scanpy as sc
+from typing import Union
 
 
 def AUCell_r(
@@ -108,3 +111,57 @@ def AUCell_r(
     adata.obsm[label] = df_auc.copy()
     adata.uns[f'{label}_threshold'] = df_aucThreshold.copy()
     adata.uns[f'{label}_assignment'] = {x: get_assignment("cells_assignment", x) for x in genesets.keys()}
+
+
+@rcontext
+def ucell_r(
+    adata: sc.AnnData, 
+    gene_sets: dict, 
+    inplace=False, 
+    rEnv=None) -> Union[None, pd.DataFrame]:
+    """
+    Run UCell analysis for scoring gene signatures in single-cell datasets.
+
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    gene_sets
+        Dictionary of gene sets.
+    inplace
+        Whether to store the results in adata.obs or return them.
+    rEnv
+        rpy2.robjects.r environment to use. If None, a new one will be created.
+    
+    Returns
+    -------
+    None or pd.DataFrame
+        If inplace is True, returns None. Otherwise, returns a dataframe containing the results.
+    """
+    importr('UCell')
+    R = ro.r
+
+    rEnv['exp_matrix'] = rtools.py2r(adata.X.T)
+    rEnv['var_names'] = rtools.py2r(list(adata.var_names))
+    rEnv['obs_names'] = rtools.py2r(list(adata.obs_names))
+    
+
+    R('''
+        rownames(exp_matrix) <- var_names
+        colnames(exp_matrix) <- obs_names
+        gene_sets <- list()
+      ''')
+    
+    for set_name, gene_list in gene_sets.items():
+        rEnv['gene_list'] = R['c'](*gene_list)
+        R(f'gene_sets${set_name} <- gene_list')
+    
+    R('scores <- ScoreSignatures_UCell(exp_matrix, features=gene_sets)')
+    R('scores <- as.data.frame(scores)')
+    scores = rtools.r2py(rEnv['scores'])
+
+    if inplace:
+        ucell_col = list(scores.columns)
+        adata.obs[ucell_col] = scores
+    else:
+        return scores
