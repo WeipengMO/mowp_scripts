@@ -4,6 +4,8 @@ from loguru import logger
 from typing import Optional, Union, Sequence, List, Iterator, Literal
 import numpy as np
 from tqdm.auto import tqdm
+import seaborn as sns
+import matplotlib as mpl
 
 
 def scanpy_pp(adata, n_top_genes=2000, n_pcs=50, n_neighbors=15, resolution=0.5, seed=1, inplace=True):
@@ -82,6 +84,8 @@ def layer_pp(adata, layer=None, total=1e4, logbase=10, scale=False):
             adata.layers['counts'] = adata.X.copy()
     else:
         logger.info('adata.layers["counts"] already exists')
+        if layer is None:
+            layer = 'counts'
         
     adata.layers['log1p_norm'] = adata.layers[layer].copy()
     sc.pp.normalize_total(adata, total, layer='log1p_norm')
@@ -250,3 +254,66 @@ def split_adata(
 
     else:
         assert False, "Unknown `axis` parameter"
+
+
+def get_adata_color(adata, label):
+    if f"{label}_colors" not in adata.uns:
+        set_adata_color(adata, label)
+    return {
+        x: y
+        for x, y in zip(adata.obs[label].cat.categories, adata.uns[f"{label}_colors"])
+    }
+
+
+def set_adata_color(adata, label, color_dict=None, hex=True):
+    adata.obs[label] = adata.obs[label].astype("category")
+    if color_dict:
+        if not hex:
+            from matplotlib.colors import to_hex
+            
+            color_dict = {x: to_hex(y) for x, y in color_dict.items()}
+
+        _dt = get_adata_color(adata, label)
+        _dt.update(color_dict)
+        color_dict = _dt
+        adata.uns[f"{label}_colors"] = [
+            color_dict[x] for x in adata.obs[label].cat.categories
+        ]
+    else:
+        if f"{label}_colors" not in adata.uns:
+            sc.pl._utils._set_default_colors_for_categorical_obs(adata, label)
+
+    return adata
+
+
+def set_paired_color(adata, label, sufix='_T'):
+    '''
+    Set paired color for adata.obs[label] and adata.obs[label + sufix]
+
+    Parameters
+    ----------
+    adata : AnnData
+        The AnnData object to be preprocessed.
+    label : str
+        The label to be set color.
+    sufix : str, optional
+        The sufix of the label. The default is '_T'.
+    
+    Examples
+    --------
+    >>> sctk.pp.set_paired_color(adata, 'patient')
+    '''
+    n_colors = len(adata.obs[label].cat.categories)
+    if n_colors <= 10:
+        c1 = sns.color_palette(None, n_colors)
+        c2 = sns.color_palette('pastel', n_colors)
+    else:
+        c1 = sns.husl_palette(n_colors, s=1)
+        c2 = sns.husl_palette(n_colors, l=.85)
+
+    color_dict = {}
+    for i, patient in enumerate(adata.obs['patient'].cat.categories):
+        color_dict[patient] = mpl.colors.to_hex(c1[i])
+        color_dict[patient + sufix] = mpl.colors.to_hex(c2[i])
+    
+    set_adata_color(adata, 'batch', color_dict)

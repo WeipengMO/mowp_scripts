@@ -12,7 +12,8 @@ class Colormaps():
             "grey_yellow": colors.LinearSegmentedColormap.from_list("grey_yellow", ["lightgray", "yellow", "gold"], N=256),
             "grey_violet": colors.LinearSegmentedColormap.from_list("grey_violet", ["lightgray", "mediumvioletred", "indigo"], N=256),
             "grey_blue": colors.LinearSegmentedColormap.from_list("grey_blue", ["lightgray", "cornflowerblue", "darkblue"], N=256),
-            "magma": colors.LinearSegmentedColormap.from_list("magma", matplotlib.colormaps["magma"].colors+['white'], N=256)
+            "magma": colors.LinearSegmentedColormap.from_list("magma", matplotlib.colormaps["magma"].colors+['white'], N=256),
+            "magma_r": colors.LinearSegmentedColormap.from_list("magma_r", ['white'] + matplotlib.colormaps["magma_r"].colors, N=256)
         }
 
     def __getitem__(self, key):
