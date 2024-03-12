@@ -2,9 +2,6 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 from typing import Union, List
-from pydeseq2.dds import DeseqDataSet
-from pydeseq2.ds import DeseqStats
-from pydeseq2.default_inference import DefaultInference
 from loguru import logger
 from ..utils import rtools
 from ..utils.rtools import rcontext
@@ -120,6 +117,10 @@ def run_deseq2(
     dds
         The DESeq2 object.
     """
+    from pydeseq2.dds import DeseqDataSet
+    from pydeseq2.ds import DeseqStats
+    from pydeseq2.default_inference import DefaultInference
+    
     
     counts = pd.DataFrame(pb.X, columns = pb.var_names, index=pb.obs_names) # need to do this to pass var names
     inference = DefaultInference(n_cpus=n_cpus)

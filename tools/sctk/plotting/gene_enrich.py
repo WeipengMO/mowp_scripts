@@ -110,11 +110,12 @@ def plot_volcano(
     if ax is None:
         fig, ax = plt.subplots(figsize = figsize)
 
+    df = df.copy()
     df['nlog10'] = -np.log10(df[pvalue_key])
-    pvalue_threshold = -np.log10(pvalue_threshold)
-    df_up = df[(df[log2fc_key] > log2fc_threshold) & (df.nlog10 > pvalue_threshold)]
-    df_down = df[(df[log2fc_key] < -log2fc_threshold) & (df.nlog10 > pvalue_threshold)]
-    df_rest = df[(df[log2fc_key].abs() < log2fc_threshold) | (df.nlog10 < pvalue_threshold)]
+    log_pvalue_threshold = -np.log10(pvalue_threshold)
+    df_up = df[(df[log2fc_key] > log2fc_threshold) & (df.nlog10 > log_pvalue_threshold)]
+    df_down = df[(df[log2fc_key] < -log2fc_threshold) & (df.nlog10 > log_pvalue_threshold)]
+    df_rest = df[(df[log2fc_key].abs() <= log2fc_threshold) | (df.nlog10 <= log_pvalue_threshold)]
 
     sns.scatterplot(
         data = df_rest, x = log2fc_key, y = 'nlog10',
@@ -130,7 +131,7 @@ def plot_volcano(
 
 
     if gene_list is None:
-        _df = df[(df[pvalue_key] < 0.01) & (abs(df[log2fc_key]) > 1)]
+        _df = df[(df[pvalue_key] < pvalue_threshold) & (abs(df[log2fc_key]) > log2fc_threshold)]
         if 'stat' in _df.columns:
             _df_sorted = _df.sort_values('stat')
             gene_list = list(_df_sorted.index[:n_top//2]) + list(_df_sorted.index[-n_top//2:])
@@ -148,7 +149,7 @@ def plot_volcano(
         adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'))
 
 
-    ax.axhline(pvalue_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
+    ax.axhline(log_pvalue_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
     ax.axvline(log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
     ax.axvline(-log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
 
