@@ -3,10 +3,7 @@
 
 
 from .common import version as __version__
-from . import pp
-from . import tl
-from . import pl
-from . import sample_data
-from .utils import settings
+from . import pp, tl, pl, read, sample_data, utils
 
+from .utils import settings
 settings.set_seed()

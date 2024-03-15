@@ -61,7 +61,7 @@ def nmf_k(adata: ad.AnnData, k: int, sample: str, filter_genes: bool = True):
 def get_nmf_programs(adata: ad.AnnData, sample_key: str, sample_names: list, k_start: int = 4, k_end: int = 9, min_cells: int = 50, filter_genes: bool = True):
     programs_list, nmf_scores_list = [], []
     for sample in sample_names:
-        _adata = adata[adata.obs[sample_key] == sample]
+        _adata = adata[adata.obs[sample_key] == sample].copy()
         logger.info(f'Processing {sample}')
 
         k_values = np.arange(k_start, k_end + 1)
@@ -341,7 +341,7 @@ class MetaProgram():
     
 
     def heatmap(self, figsize=(5, 5), vmax=.5, vmin=.1):
-        from ..plotting import Colormaps
+        from ..pl import Colormaps
         colormaps = Colormaps()
     
         g = sns.clustermap(

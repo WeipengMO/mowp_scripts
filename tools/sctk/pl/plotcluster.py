@@ -1,5 +1,5 @@
 from typing import Optional
-from ..preprocessing import adata_process
+from ..pp import adata_process
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -9,12 +9,13 @@ def percent_in_cluster(
     groupby: str,
     label: str,
     labelColor: Optional[dict] = None,
-    needCounts=True,
+    needCounts: bool = True,
     ax=None,
-    plot_legend=True,
-    legend_kwargs={"bbox_to_anchor": [1, 1]},
-    swapAxes=False,
-    sort_index=False,
+    plot_legend: bool = True,
+    legend_kwargs: dict ={"bbox_to_anchor": [1, 1]},
+    swapAxes: bool = False,
+    sort_index: bool = False,
+    order: list = None,
 ):
     """
     Plot the percentage of each label in each groupby category.
@@ -41,6 +42,8 @@ def percent_in_cluster(
         Whether to swap the x-axis and y-axis.
     sort_index
         Whether to sort the index.
+    order:
+        The order of the labels.
 
     Returns
     -------
@@ -60,6 +63,9 @@ def percent_in_cluster(
     if sort_index:
         index = sorted(groupbyWithLabelCountsDf.index)
         groupbyWithLabelCountsDf = groupbyWithLabelCountsDf.reindex(index)
+
+    if order is not None:
+        groupbyWithLabelCountsDf = groupbyWithLabelCountsDf[order]
     
     groupbyWithLabelCounts_CumsumPercDf = groupbyWithLabelCountsDf.pipe(
         lambda x: x.cumsum(1).div(x.sum(1), 0) * 100
