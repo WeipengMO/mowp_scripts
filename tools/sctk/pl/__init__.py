@@ -2,6 +2,7 @@ import matplotlib
 from matplotlib import colors
 from .plotcluster import *
 from .gene_enrich import *
+from .enhanced_scanpy import *
 
 
 class Colormaps():
