@@ -15,7 +15,8 @@ def percent_in_cluster(
     legend_kwargs: dict ={"bbox_to_anchor": [1, 1]},
     swapAxes: bool = False,
     sort_index: bool = False,
-    order: list = None,
+    index_order: list = None,
+    label_order: list = None,
 ):
     """
     Plot the percentage of each label in each groupby category.
@@ -42,7 +43,9 @@ def percent_in_cluster(
         Whether to swap the x-axis and y-axis.
     sort_index
         Whether to sort the index.
-    order:
+    index_order
+        The order of the index.
+    label_order:
         The order of the labels.
 
     Returns
@@ -63,9 +66,11 @@ def percent_in_cluster(
     if sort_index:
         index = sorted(groupbyWithLabelCountsDf.index)
         groupbyWithLabelCountsDf = groupbyWithLabelCountsDf.reindex(index)
+    elif index_order is not None:
+        groupbyWithLabelCountsDf = groupbyWithLabelCountsDf.reindex(index_order)
 
-    if order is not None:
-        groupbyWithLabelCountsDf = groupbyWithLabelCountsDf[order]
+    if label_order is not None:
+        groupbyWithLabelCountsDf = groupbyWithLabelCountsDf[label_order]
     
     groupbyWithLabelCounts_CumsumPercDf = groupbyWithLabelCountsDf.pipe(
         lambda x: x.cumsum(1).div(x.sum(1), 0) * 100

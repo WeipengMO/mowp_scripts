@@ -87,6 +87,7 @@ def run_deseq2(
         condition_key: str = 'condition',
         treatment_key: str = 'treat',
         control_key: str = 'ctrl',
+        ref_level: list = None,
         plot_pca: bool = False,
         lfc_shrink: bool = True,
         n_cpus: int = 8):
@@ -129,6 +130,7 @@ def run_deseq2(
         counts = counts,
         metadata=pb.obs,
         design_factors=condition_key,
+        ref_level=ref_level,
         refit_cooks=True,
         inference=inference)
 

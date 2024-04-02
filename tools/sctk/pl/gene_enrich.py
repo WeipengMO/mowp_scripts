@@ -60,6 +60,7 @@ def plot_volcano(
         gene_list: list = None,
         ax = None,
         figsize = (4, 4),
+        fontsize = 8,
         up_color: str = '#d62728',
         down_color: str = '#1f77b4',
         rest_color: str = 'lightgrey'):
@@ -145,7 +146,7 @@ def plot_volcano(
         for item in df[df.index.isin(gene_list)].itertuples():
             texts.append(
                 plt.text(x = item.log2FoldChange, y = item.nlog10, s = item.Index,
-                weight = 'bold'))
+                fontsize=fontsize, weight = 'bold'))
         adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'))
 
 
