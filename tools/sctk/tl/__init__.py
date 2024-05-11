@@ -3,3 +3,4 @@ from .clusterProfiler import go_analysis
 from .inferCNV import run_inferCNV_r
 from .pseudobulk_DEG import create_pseudo_bulk, run_deseq2, run_edgeR
 from .meta_program import MetaProgram
+from ._clustermap import ClusterMap
