@@ -35,7 +35,7 @@ class ClusterMap:
         self.Z = Z
     
 
-    def _get_dendrogram(self, threshold=.7, show=True):
+    def _get_dendrogram(self, threshold=.7, show=True, figsize=(12, 3)):
         '''
         Get the dendrogram of the data matrix.
         '''
@@ -43,7 +43,7 @@ class ClusterMap:
         color_threshold = threshold*max(Z[:,2])
 
         if show:
-            plt.figure(figsize=(12, 3))
+            plt.figure(figsize=figsize)
 
         dendrogram_res = dendrogram(
             Z, 
@@ -54,7 +54,7 @@ class ClusterMap:
         self.dendrogram_res = dendrogram_res
         
 
-    def get_clusters(self, threshold=.7, show=True):
+    def get_clusters(self, threshold=.7, show=True, figsize=(12, 3)):
         '''
         Get the clusters based on the dendrogram.
 
@@ -66,7 +66,7 @@ class ClusterMap:
         show: bool
             Whether to show the dendrogram. Default is True.
         '''
-        self._get_dendrogram(threshold=threshold, show=show)
+        self._get_dendrogram(threshold=threshold, show=show, figsize=figsize)
         dendrogram_res = self.dendrogram_res
         
         idx = 0
