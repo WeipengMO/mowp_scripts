@@ -1,7 +1,12 @@
+configfile: 
+    "config.yml"
+
+suffix = config['suffix']
+
 rule run_fastp:
     input:
-        fq1='raw_data/{sample_name}_1.fastq.gz',
-        fq2='raw_data/{sample_name}_2.fastq.gz',
+        fq1='raw_data/{sample_name}_1'+f'{suffix}',
+        fq2='raw_data/{sample_name}_2'+f'{suffix}',
     output:
         fq1=temp('raw_data/{sample_name}_R1.clean.fq.gz'),
         fq2=temp('raw_data/{sample_name}_R2.clean.fq.gz')
@@ -14,7 +19,6 @@ rule run_fastp:
 fastp -i {input.fq1} -I {input.fq2} -o {output.fq1} -O {output.fq2} -w {threads} -h {params.html} -j {params.json}
         '''
         
-
 # paired-end
 rule run_bowtie2_pe:
     input:
@@ -26,6 +30,7 @@ rule run_bowtie2_pe:
     params:
         genome=config['genome']
     threads: 30
+    conda: 'chipseq'
     shell:
         '''
 bowtie2 -t -p {threads} --dovetail -X 1000 -x {params.genome} -1 {input.fq1} -2 {input.fq2} | samtools sort -@ {threads} -O bam -o {output.bam} -
@@ -40,9 +45,11 @@ rule MarkDuplicates:
         bam='aligned_data/{sample_name}.sorted.rmdup.bam',
         bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
     threads: 8
+    params:
+        picard=config['picard_path']
     shell:
         '''
-java -jar /public/apps/picard_2.20.2/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
+java -jar {params.picard} MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
 samtools index -@ 10 {output.bam}
         '''
 
@@ -57,7 +64,7 @@ rule bamCoverage:
         gsize=config['gsize']
     shell:
         '''
-bamCoverage --bam {input} -o {output} --binSize 10 --normalizeUsing RPGC --effectiveGenomeSize {params.gsize} --skipNonCoveredRegions --numberOfProcessors {threads}
+bamCoverage --bam {input} -o {output} --binSize 10 --normalizeUsing CPM --skipNonCoveredRegions --numberOfProcessors {threads}
         '''
 
 

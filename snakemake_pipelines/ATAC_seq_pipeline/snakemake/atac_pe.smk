@@ -1,14 +1,12 @@
-'''
-Author       : windz
-Date         : 2020-09-04 14:47:27
-LastEditTime : 2022-04-02 18:26:57
-Description  :
-'''
+configfile: 
+    "config.yml"
+
+suffix = config['suffix']
 
 rule run_fastp:
     input:
-        fq1='raw_data/{sample_name}_1.fastq.gz',
-        fq2='raw_data/{sample_name}_2.fastq.gz',
+        fq1='raw_data/{sample_name}_1'+f'{suffix}',
+        fq2='raw_data/{sample_name}_2'+f'{suffix}',
     output:
         fq1=temp('raw_data/{sample_name}_R1.clean.fq.gz'),
         fq2=temp('raw_data/{sample_name}_R2.clean.fq.gz')
@@ -33,6 +31,7 @@ rule run_bowtie2_pe:
     params:
         genome=config['genome']
     threads: 30
+    conda: 'chipseq'
     shell:
         '''
 bowtie2 -t -p {threads} --very-sensitive -X 2000 -x {params.genome} -1 {input.fq1} -2 {input.fq2} | samtools sort -@ {threads} -O bam -o {output.bam} -
@@ -46,10 +45,12 @@ rule MarkDuplicates:
     output:
         bam='aligned_data/{sample_name}.sorted.rmdup.bam',
         bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
+    params:
+        picard=config['picard_path']
     threads: 8
     shell:
         '''
-java -jar /public/apps/picard_2.20.2/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
+java -jar {params.picard} MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt
 samtools index -@ 10 {output.bam}
         '''
 
@@ -92,11 +93,11 @@ rule macs2_callpeak:
         name='{sample_name}',
         out_dir='macs2_result/',
         gsize=config['gsize']
+    conda:
+        'chipseq'
     shell:
         '''
-export PATH=/public/home/mowp/anaconda3/envs/container/bin:$PATH
-
-singularity run -B /data:/data ~/test/singularity/macs.sif macs2 callpeak -t {input.treatment} -f BAM -g {params.gsize} -n {params.name} --nomodel --shift -100 --extsize 200 --outdir {params.out_dir}
+macs2 callpeak -t {input.treatment} -f BAM -g {params.gsize} -n {params.name} --nomodel --shift -100 --extsize 200 --outdir {params.out_dir}
         '''
 
 
@@ -106,9 +107,11 @@ rule run_Genrich:
     output:
         bam=temp('aligned_data/{sample_name}.sorted.name.bam'),
         peak='genrich_result/{sample_name}_peaks.narrowPeak',
+    params:
+        exclude_chroms=config['exclude_chroms']
     threads: 1
     shell:
         '''
 samtools sort -n -@ 30 -O bam -o {output.bam} {input}
-Genrich -t {output.bam} -o {output.peak} -j  -y  -r  -e Pt,Mt  -v
+Genrich -t {output.bam} -o {output.peak} -j  -y  -r  -e {params.exclude_chroms}  -v
         '''

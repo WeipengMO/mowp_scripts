@@ -1,14 +1,13 @@
-'''
-Author       : windz
-Date         : 2020-05-18 20:38:48
-LastEditTime : 2021-12-08 14:20:05
-'''
+configfile: 
+    "config.yml"
 
+suffix = config['suffix']
+sep = config['sep']
 
 rule run_fastp:
     input:
-        fq1='raw_data/{sample_name}_1.fastq.gz',
-        fq2='raw_data/{sample_name}_2.fastq.gz',
+        fq1='raw_data/{sample_name}_1'+f'{suffix}',
+        fq2='raw_data/{sample_name}_2'+f'{suffix}',
     output:
         fq1=temp('raw_data/{sample_name}.1.clean.fastq.gz'),
         fq2=temp('raw_data/{sample_name}.2.clean.fastq.gz')
@@ -31,11 +30,11 @@ rule run_hisat2_pe:
         bai=temp('aligned_data/{sample_name}.sorted.bam.bai')
     params:
         genome=config['genome'],
-        max_intronlen=config['max_intronlen'],
     threads: 30
+    conda: 'rnaseq'
     shell:
         '''
-hisat2 -x {params.genome} -p {threads} --min-intronlen 20 --max-intronlen {params.max_intronlen} --dta --time -1 {input.fq1} -2 {input.fq2} | samtools sort -@ {threads} -O bam -o {output.bam} - && samtools index {output.bam}
+hisat2 -x {params.genome} -p {threads} --dta --time -1 {input.fq1} -2 {input.fq2} | samtools sort -@ {threads} -O bam -o {output.bam} - && samtools index {output.bam}
         '''
 
 
@@ -46,7 +45,8 @@ rule MarkDuplicates:
         bam='aligned_data/{sample_name}.sorted.rmdup.bam',
         bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
     threads: 8
+    conda: 'rnaseq'
     shell:
         '''
-java -jar /public/apps/picard_2.20.2/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt && samtools index {output.bam}
+java -jar /data/software/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt && samtools index {output.bam}
         '''

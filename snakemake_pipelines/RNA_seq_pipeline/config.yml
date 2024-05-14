@@ -2,9 +2,10 @@
 mode: pe
 workdir: .
 
-# genome
-genome: /public/home/mowp/db/Arabidopsis_thaliana/dna/hisat2_index/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa
-ann_gff: /public/home/mowp/db/Arabidopsis_thaliana/gff3/Araport11_GFF3_genes_transposons.201606.gff 
+# sample
+suffix: .fq.gz
+sep: _1
 
-# hisat2
-max_intronlen: 15000
+# genome
+genome: /home/mowp/db/mm10/dna/hisat2_index/genome
+ann_gff: /data/user/mowp/db/mm10/gtf/genes.gtf

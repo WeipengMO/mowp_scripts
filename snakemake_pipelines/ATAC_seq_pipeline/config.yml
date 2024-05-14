@@ -3,6 +3,16 @@ mode: pe
 workdir: .
 
 # genome
-genome: /data/Zhaijx/mowp/db/col-CEN/dna/bowtie2_index/Col-CEN_v1.2.fasta 
-bed: /data/Zhaijx/mowp/db/col-CEN/bed/gene.bed
-gsize: 132081078
+genome: /data/user/mowp/db/mm10/dna/bowtie2_index/genome.fa
+bed: /data/user/mowp/db/mm10/bed/genes.bed
+gsize: mm
+
+# sample
+suffix: .fq.gz
+sep: _1
+
+# software
+picard_path: /data/software/picard.jar
+
+# Comma-separated list of chromosomes to exclude for Genrich
+exclude_chroms: chrM

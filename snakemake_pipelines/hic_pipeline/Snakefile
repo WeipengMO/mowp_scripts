@@ -3,8 +3,11 @@ import os
 
 configfile:'config.yaml'
 
+suffix = config['suffix']
+sep = config['sep']
+
 resolution=config['resolution']
-sample = [os.path.basename(i).split('_R1')[0] for i in glob('raw_data/*_R1.fq.gz')]
+sample = [os.path.basename(i).split(sep)[0] for i in glob(f'raw_data/*{sep}{suffix}')]
 
 
 # onsuccess:
@@ -20,8 +23,8 @@ rule all:
 
 rule run_bwa:
     input:
-        fastq1='raw_data/{sample}_R1.fq.gz',
-        fastq2='raw_data/{sample}_R2.fq.gz',
+        fastq1='raw_data/{sample}_1'+f'{suffix}',
+        fastq2='raw_data/{sample}_2'+f'{suffix}',
     output: 
         'aligned_data/{sample}.bam'
     threads: 30

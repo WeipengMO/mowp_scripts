@@ -1,14 +1,21 @@
 # snakemake
-mode: se
+mode: pe
 workdir: .
 
 # genome
-genome: /data/Zhaijx/mowp/db/Arabidopsis_thaliana/dna/bowtie2_index/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa
-bed: /public/home/mowp/db/Arabidopsis_thaliana/isoform/araport11.gene.bed
-gsize: 119481543 # 132081078 for col_CEN
+genome: /data/user/mowp/db/mm10/dna/bowtie2_index/genome.fa
+bed: /data/user/mowp/db/mm10/bed/genes.bed
+gsize: mm
 
 # sample table
 sample_table: sample_table.tsv
 
-# sample_name
-sample_name: ['col_H3K4me3_ChIPseq_GSM4275144.1', 'col_input_ChIPseq_GSM4275149.1']
+# sample
+suffix: .fq.gz
+sep: _1
+
+# software
+picard_path: /data/software/picard.jar
+
+# Comma-separated list of chromosomes to exclude for Genrich
+exclude_chroms: chrM

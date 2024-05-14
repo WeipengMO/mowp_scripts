@@ -7,6 +7,8 @@ rule run_stringtie:
     params:
         gff=config['ann_gff'],
         gene_abund='stringtie/{sample_name}/{sample_name}.gene_abund.tab'
+    conda:
+        'rnaseq'
     shell:
         '''
 stringtie -A {params.gene_abund} -e --rf -B -p {threads} --rf -G {params.gff} -o {output} {input}
@@ -23,9 +25,10 @@ rule extract_rpkm:
         label='{sample_name}',
         path='stringtie/{sample_name}/'
     threads: 1
+    conda:
+        'R'
     shell:
         '''
-export PATH=/public/home/mowp/anaconda3/envs/R/bin/:$PATH
 Rscript script/extract_rpkm_from_ballgown.R {params.label} {params.path} {output.mrna} {output.gene}
         '''
 
@@ -33,7 +36,7 @@ Rscript script/extract_rpkm_from_ballgown.R {params.label} {params.path} {output
 # 整合stringtie结果，提取基因/转录本count
 # prepDE.py 为stringtie的一个脚本
 # /public/home/mowp/softwares/bio/bin/prepDE.py
-sample_name = [os.path.basename(fn.split('_1')[0]) for fn in glob('raw_data/*_1.fastq.gz')]
+sample_name = [os.path.basename(fn.split('_1')[0]) for fn in glob('raw_data/*_1.fq.gz')]
 rule extract_gene_count:
     input:
         [f'stringtie/{sample_name}/{sample_name}.RNA.rpkm.txt' for sample_name in sample_name]
@@ -43,6 +46,8 @@ rule extract_gene_count:
     threads: 1
     params:
         in_dir='stringtie'
+    conda:
+        'rnaseq'
     shell:
         '''
 prepDE.py -g {output.gene_count_matrix} -t {output.transcript_count_matrix} -i {params.in_dir}
@@ -60,4 +65,16 @@ rule AScaller:
     shell:
         '''
 python script/ASCaller.py -i {input} -o {output} --file_intron_pos {params.intron_pos} --strand_flag 0 --min_overlap 6
+        '''
+
+
+rule make_bigwig:
+    input:
+        'aligned_data/{sample_name}.sorted.rmdup.bam'
+    output:
+        'bigwig/{sample_name}.bw'
+    threads: 16
+    shell:
+        '''
+bamCoverage -b {input} -o {output} -p {threads} --normalizeUsing RPKM --binSize 10
         '''
