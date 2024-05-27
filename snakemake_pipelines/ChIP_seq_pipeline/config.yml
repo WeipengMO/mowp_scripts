@@ -5,7 +5,7 @@ workdir: .
 # genome
 genome: /data/user/mowp/db/mm10/dna/bowtie2_index/genome.fa
 bed: /data/user/mowp/db/mm10/bed/genes.bed
-gsize: mm
+gsize: hs
 
 # sample table
 sample_table: sample_table.tsv
