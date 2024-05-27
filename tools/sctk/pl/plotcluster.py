@@ -1,7 +1,12 @@
 from typing import Optional
-from ..pp import adata_process
 import matplotlib.pyplot as plt
 import seaborn as sns
+from typing import List, Dict, Optional
+from loguru import logger
+import numpy as np
+from ._color import ColorPalette
+from ..pp import adata_process
+from ..utils import configure_logger
 
 
 def percent_in_cluster(
@@ -147,81 +152,186 @@ def percent_in_cluster(
     return ax
 
 
-def percent_in_cluster_group(
-        adata, 
-        groupby: str, 
-        label: str, 
-        group_dict: dict, 
-        figsize: tuple = (8, 3),
-        sort_index: bool = True):
-
-    """
-    Plot the percentage of each label in each groupby category.
+def _get_group_data(
+    adata, groupby: str, key: str, 
+    subgroups: Dict[str, List[str]] = None):
+    '''
+    Get the percentage of each cell type in each group.
 
     Parameters
     ----------
-    adata
-        Annotated data matrix.
-    groupby
-        The column name of the category. eg. 'batch'
-    label
-        The column name of the label. eg. 'cell_type'
-    group_dict
-        A dictionary with group name as key and group list as value. eg. {'group1': ['label1', 'label2'], 'group2': ['label3', 'label4']}
-    figsize
-        The figure size.
-    sort_index
-        Whether to sort the index.
+    adata: AnnData
+        Annotated data object containing the cell data.
+    groupby: str
+        The key of the observation grouping to consider. eg. "batch"
+    key: List[str]
+        Keys for accessing fields of `.obs`. eg. "cell_type"
+    '''
     
-    Examples
-    --------
-    >>> cd45_pos = [
-            'B cells', 'NK cells', 'T cells', 'TAM', 'macrophages', 'mast cells',
-            'neutrophils', 'pDCs', 'plasma cells']
-        cd45_neg = [
-            'endothelial cells', 'fibroblasts', 'maligant cells']
-        group_dict = {
-            'CD45+': cd45_pos,
-            'CD45-': cd45_neg}
-    >>> sctk.pl.percent_in_cluster_group(adata, 'batch', 'cell_type', group_dict)
+    df = adata.obs.groupby(groupby)[key].apply(lambda x: x.value_counts()).unstack()
+    df = df.div(df.sum(axis=1), axis=0) * 100
+
+    df_group = {}
+    if subgroups is not None:
+        assert len(subgroups) == 2, 'subgroups must have 2 groups'
+        for group, sub in subgroups.items():
+            df_group[group] = df.loc[sub, :].copy()
+    else:
+        df_group['all'] = df
+    
+    return df_group
+
+
+def _reorder_data(df_group: dict, keys_to_order: list = None):
+    if keys_to_order is None:
+        return
+
+    if isinstance(keys_to_order, str):
+        keys_to_order = [keys_to_order]
+
+    for key in df_group:
+        df = df_group[key].loc[:, keys_to_order].copy()
+        df['row_sum'] = df.sum(axis=1)
+        df = df.sort_values('row_sum', ascending=False)
+        index_order = df.index
+        df_group[key] = df_group[key].reindex(index_order)
+
+
+def _plot_grouped_bars(adata, df_group, subkeys, key, groupby, figsize=(8, 4), subtitle=True, debug=True):
+    """
+    Plot grouped bar charts with legend outside the figure.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix.
+    df_group : dict of DataFrame
+        Dictionary where keys are group names and values are DataFrames for plotting.
+    subkeys : dict
+        Dictionary where keys are group indices and values are lists of cell types.
+    key : str, optional
+        Key to use for cell types in `adata.obs` .
+    groupby : str, optional
+        Key to group by in `adata.obs`.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The resulting figure object.
+    axes : numpy.ndarray of matplotlib.axes._subplots.AxesSubplot
+        Array of axes objects.
     """
 
-    assert len(group_dict) == 2, 'group_dict must have 2 groups'
-    
-    # A dataframe with groupby as index and label as columns, values are counts
-    groupby_label_counts_df = (
-        adata.obs.groupby(groupby)[label].apply(lambda x: x.value_counts()).unstack()
+    if debug:
+        configure_logger(log_level="debug")
+    else:
+        configure_logger(log_level="info")
+
+
+    label_color_key = f'{key}_colors'
+    if label_color_key in adata.uns:
+        # Get color mapping from adata.uns
+        cell_type_colors = dict(zip(adata.obs[key].cat.categories, adata.uns[label_color_key]))
+    else:
+        cell_type_colors = dict(zip(
+            adata.obs[key].cat.categories, 
+            ColorPalette(len(adata.obs[key].cat.categories), 'tab20').to_array()))
+
+    # Determine width ratios for subplots
+    width_ratios = [len(df) for df in df_group.values()]
+
+    fig, axes = plt.subplots(
+        nrows=1, ncols=len(width_ratios),
+        figsize=figsize,
+        gridspec_kw={'width_ratios': width_ratios},
+        sharey=True
     )
 
-    label_color = f'{label}_colors'
-    if label_color in adata.uns:
-        # get the same color set from adata.uns
-        label_color = dict(zip(adata.obs[label].cat.categories, adata.uns[label_color]))
-    else:
-        label_color = None
-
-    if sort_index:
-        index = sorted(groupby_label_counts_df.index)[::-1]
-        groupby_label_counts_df = groupby_label_counts_df.reindex(index)
-
-    fig, ax = plt.subplots(1, 2, figsize=figsize, sharey=True)
-
-    for i, group_name in enumerate(group_dict):
-        _group = group_dict[group_name]
-        color = [label_color[x] for x in _group]
-        
-        data = groupby_label_counts_df.loc[:, _group]
-        data_percentage = data.div(data.sum(axis=1), axis=0) * 100
-        data_percentage.plot(kind='barh', stacked=True, ax=ax[i], legend=True, color=color)
-        
-        ax[i].set_title(group_name)
-        ax[i].set_ylabel('')
-        ax[i].set_xlim(0, 100)
-        ax[i].grid(False)
-        ax[i].legend(loc='upper left', bbox_to_anchor=(0, -.2), ncol=2, frameon=False)
-
-    fig.text(0.5, -.01, 'Percentage of cells', ha='center')
-
-    plt.subplots_adjust(wspace=.1)
+    logger.debug(f"{width_ratios=}")
     
-    return ax
+    if not isinstance(axes, np.ndarray):
+        axes = [axes]
+
+    is_first_axes = True
+    for ax, (batch, df) in zip(axes, df_group.items()):
+        if not is_first_axes:
+            ax.tick_params(axis='y', which='both', left=False, labelleft=False)
+        is_first_axes = False
+        
+        for i, cell_type_list in enumerate(subkeys.values()):
+            plot_df = df.loc[:, cell_type_list]
+            colors = [cell_type_colors[cell_type] for cell_type in plot_df.columns]
+
+            if i == 1:
+                plot_df *= -1
+            
+            plot_df.plot(kind='bar', stacked=True, ax=ax, legend=False, color=colors)
+            ax.axhline(0, ls='--', color='k')
+            if subtitle:
+                ax.set_title(batch)
+            ax.tick_params(axis='x', which='both', bottom=False, labelbottom=True)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+            ax.set_xlabel('')
+
+            sns.despine(left=True, bottom=True)
+    
+    axes[0].set_ylabel('Percentage')
+
+    # Create legend
+    handles, labels = [], []
+    for cell_type, color in cell_type_colors.items():
+        handles.append(plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10))
+        labels.append(cell_type)
+
+    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1.1, .9), frameon=False)
+
+    fig.subplots_adjust(wspace=0.1)
+    plt.show()
+
+
+def percent_in_cluster_group(
+    adata,
+    groupby: str,
+    key: str,
+    subgroups: Dict[str, List[str]] = None,
+    subkeys: Dict[str, List[str]] = None,
+    label_order: str = None,
+    subtitle: bool = True
+):
+    """
+    Calculate the percentage of cells in each cluster group.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix.
+    groupby : str
+        Key for the column in `adata.obs` that contains the sample labels.
+    key : str
+        Key for the column in `adata.obs` that contains the cell labels.
+    subgroups : dict
+        Dictionary mapping sample group names to a list of sample labels.
+    subkeys : dict
+        Dictionary mapping cell group names to a list of subkeys.
+    label_order : str
+        The order in which the cluster groups should be plotted.
+
+    """
+    # Get the percentage of each cell type in each group
+    df_group = _get_group_data(adata, groupby, key, subgroups)
+
+    # Reorder the data based on the label_order
+    # If subkeys is None, then label_order must be None, and ordering is by string
+    if subkeys is None:
+        subkeys = {key: adata.obs[key].cat.categories}
+        if label_order is not None:
+            raise ValueError('label_order must be None when subkeys is None')
+        keys_to_order = None
+    else:
+        keys_to_order = subkeys[label_order] if label_order is not None else None
+
+    _reorder_data(df_group, keys_to_order)
+
+    # Plot the grouped bar charts
+    _plot_grouped_bars(
+        adata, df_group, subkeys, key=key, groupby=groupby, subtitle=subtitle)
