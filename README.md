@@ -1,18 +1,22 @@
 # mowp scripts <!-- omit in toc -->
 
-This repository contains scripts that I wrote for my research.
+😎 This repository contains scripts that I wrote for data analysis and visualization.
 
 ## Table of Contents <!-- omit in toc -->
-- [snakemake\_pipelines](#snakemake_pipelines)
-- [tools](#tools)
+- [Snakemake Pipelines](#snakemake-pipelines)
+- [Tools](#tools)
 
 
-## [snakemake_pipelines](./snakemake_pipelines/)
+## Snakemake Pipelines
 
-The pipelines are designed to create scalable, consistent, and reproducible data. Pipelines are based on [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow. 
+The pipelines are designed to create scalable, consistent, and reproducible data. Pipelines are based on [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow management system. 
 
-To know more, please refer to the `snakemake_pipelines` folder.
+Please refer to the [`snakemake_pipelines`](./snakemake_pipelines/) folder.
 
-## [tools](./tools/)
+## Tools
 
 The tools folder includes scripts that I wrote for data analysis and visualization.
+
+Please refer to the [`tools`](./tools/) folder.
+
+The tutorials for "single-cell tool kits" are available in the [`sctk-tutorials`](https://github.com/WeipengMO/sctk-tutorials) repository.
