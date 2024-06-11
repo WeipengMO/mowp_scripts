@@ -1,0 +1,70 @@
+import os
+from glob import glob
+# snakemake --use-conda --use-singularity --singularity-args "-B /data:/data"
+
+
+configfile: "config.yaml"
+
+
+samples = [os.path.basename(fn.split('.h5ad')[0]) for fn in glob(f'h5ad/*.h5ad')]
+
+
+rule all:
+    input:
+        expand('output_loom/{sample}.output.loom', sample=samples)
+
+
+rule adata_to_loom:
+    input: 'h5ad/{sample}.h5ad'
+    output: 'input_loom/{sample}.input.loom'
+    conda: 'sc'
+    log: 'logs/ad2loom.{sample}.log'
+    shell: 'python adata_to_loom.py {input} {output} &> {log}'
+
+
+rule grn:
+    input: 'input_loom/{sample}.input.loom'
+    output: 'adj/{sample}.adj.csv'
+    params:
+        tfs_path = config['tfs_path'],
+        sif = config['container']
+    threads: 16
+    log: 'logs/grn.{sample}.log'
+    shell: '''
+        singularity run -B /data:/data {params.sif} pyscenic grn {input} {params.tfs_path} -o {output} --num_workers {threads} &> {log}
+    '''
+
+
+rule ctx:
+    input: 
+        adj = 'adj/{sample}.adj.csv',
+        loom_path = 'input_loom/{sample}.input.loom'
+    output: 'reg/{sample}.reg.csv'
+    params:
+        db_names = config['db_names'],
+        motif_path = config['motif_path'],
+        sif = config['container']
+    threads: 16
+    log: 'logs/ctx.{sample}.log'
+    shell: '''singularity run -B /data:/data {params.sif} pyscenic ctx {input.adj} {params.db_names} \
+        --annotations_fname {params.motif_path} \
+        --expression_mtx_fname {input.loom_path} \
+        --output {output} \
+        --mask_dropouts \
+        --num_workers {threads} &> {log}'''
+
+
+rule aucell:
+    input: 
+        reg = 'reg/{sample}.reg.csv',
+        loom_path = 'input_loom/{sample}.input.loom'
+    output: 'output_loom/{sample}.output.loom'
+    params:
+        tfs_path = config['tfs_path'],
+        sif = config['container']
+    threads: 16
+    log: 'logs/aucell.{sample}.log'
+    shell: 'singularity run -B /data:/data {params.sif} pyscenic aucell {input.loom_path} \
+        {input.reg} \
+        --output {output} \
+        --num_workers {threads} &> {log}'

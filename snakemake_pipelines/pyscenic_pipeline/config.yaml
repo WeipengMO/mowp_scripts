@@ -1,0 +1,5 @@
+container: /home/mowp/software/pyscenic-0.12.1.sif
+
+tfs_path: /data/user/mowp/db/cistarget/hg38/allTFs_hg38.txt
+db_names: '/data/user/mowp/db/cistarget/hg38/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather'
+motif_path: /data/user/mowp/db/cistarget/hg38/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl
