@@ -154,7 +154,7 @@ def percent_in_cluster(
 
 def _get_group_data(
     adata, groupby: str, key: str, 
-    subgroups: Dict[str, List[str]] = None):
+    subgroups: Dict[str, List[str]] = None, remove_suffix: bool = False):
     '''
     Get the percentage of each cell type in each group.
 
@@ -166,6 +166,10 @@ def _get_group_data(
         The key of the observation grouping to consider. eg. "batch"
     key: List[str]
         Keys for accessing fields of `.obs`. eg. "cell_type"
+    subgroups: Dict[str, List[str]]
+        Dictionary mapping group names to a list of cell types.
+    remove_suffix: bool
+        Whether to remove the suffix from the index.
     '''
     
     df = adata.obs.groupby(groupby)[key].apply(lambda x: x.value_counts()).unstack()
@@ -176,6 +180,9 @@ def _get_group_data(
         assert len(subgroups) == 2, 'subgroups must have 2 groups'
         for group, sub in subgroups.items():
             df_group[group] = df.loc[sub, :].copy()
+            if remove_suffix:
+                # TODO: This hack to remove the suffix from the index not work for all cases
+                df_group[group].index = df_group[group].index.map(lambda x: x.split('_')[0])
     else:
         df_group['all'] = df
     
@@ -197,7 +204,7 @@ def _reorder_data(df_group: dict, keys_to_order: list = None):
         df_group[key] = df_group[key].reindex(index_order)
 
 
-def _plot_grouped_bars(adata, df_group, subkeys, key, groupby, figsize=(8, 4), subtitle=True, debug=True):
+def _plot_grouped_bars(adata, df_group, subkeys, key, figsize, subtitle=True, debug=True):
     """
     Plot grouped bar charts with legend outside the figure.
 
@@ -296,7 +303,9 @@ def percent_in_cluster_group(
     subgroups: Dict[str, List[str]] = None,
     subkeys: Dict[str, List[str]] = None,
     label_order: str = None,
-    subtitle: bool = True
+    subtitle: bool = True,
+    figsize: tuple = (8, 4),
+    remove_suffix: bool = False,
 ):
     """
     Calculate the percentage of cells in each cluster group.
@@ -315,10 +324,15 @@ def percent_in_cluster_group(
         Dictionary mapping cell group names to a list of subkeys.
     label_order : str
         The order in which the cluster groups should be plotted.
-
+    subtitle : bool
+        Whether to add a subtitle to each subplot.
+    figsize : tuple
+        Size of the figure.
+    remove_suffix : bool
+        Whether to remove the suffix from the index.
     """
     # Get the percentage of each cell type in each group
-    df_group = _get_group_data(adata, groupby, key, subgroups)
+    df_group = _get_group_data(adata, groupby, key, subgroups, remove_suffix=remove_suffix)
 
     # Reorder the data based on the label_order
     # If subkeys is None, then label_order must be None, and ordering is by string
@@ -334,4 +348,4 @@ def percent_in_cluster_group(
 
     # Plot the grouped bar charts
     _plot_grouped_bars(
-        adata, df_group, subkeys, key=key, groupby=groupby, subtitle=subtitle)
+        adata, df_group, subkeys, key=key, figsize=figsize, subtitle=subtitle)

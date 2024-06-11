@@ -1,4 +1,8 @@
 from .plotcluster import percent_in_cluster, percent_in_cluster_group
 from .gene_enrich import plot_go_results, plot_volcano
-from .enhanced_scanpy import adjust_heatmap_labels, adjust_groupby_ax
+from .enhanced_scanpy import (
+    adjust_heatmap_labels, 
+    adjust_groupby_ax, 
+    set_adata_color,
+    boxplot)
 from ._color import ColorMaps, ColorPalette
