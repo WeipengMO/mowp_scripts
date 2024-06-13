@@ -6,3 +6,4 @@ from .enhanced_scanpy import (
     set_adata_color,
     boxplot)
 from ._color import ColorMaps, ColorPalette
+from ._dotplot import DotPlot
