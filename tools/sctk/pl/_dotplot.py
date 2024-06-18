@@ -32,6 +32,8 @@ class DotPlot:
             wspace: float =.2,
             vmax: float = None,
             vmin: float = None,
+            max_size: float = None,
+            min_size: float = None,
             row_cluster: bool = False, 
             col_cluster: bool = False,
             cmap: str = 'Reds',
@@ -56,6 +58,10 @@ class DotPlot:
                 The maximum value to be shown on the colorbar. Default is None.
             vmin : float, optional
                 The minimum value to be shown on the colorbar. Default is None.
+            max_size : float, optional
+                The maximum size value to be used. Default is None.
+            min_size : float, optional
+                The minimum size value to be used. Default is None.
             row_cluster : bool, optional
                 Whether to cluster the rows. Default is False.
             col_cluster : bool, optional
@@ -88,13 +94,20 @@ class DotPlot:
             size_df = (self.size_df.reset_index().
                        rename(columns={'index': 'col_names'}).
                        melt(id_vars='col_names', var_name='row_names', value_name='Size'))
-            if reverse_size:
-                df['Size'] = -size_df['Size'].apply(lambda x: np.log10(x))
 
             if vmax is not None:
                 df['Value'] = df['Value'].clip(upper=vmax)
             if vmin is not None:
                 df['Value'] = df['Value'].clip(lower=vmin)
+
+            if max_size is not None:
+                df['Size'] = df['Size'].clip(upper=max_size)
+            if min_size is not None:
+                df['Size'] = df['Size'].clip(lower=min_size)
+
+            if reverse_size:
+                df['Size'] = -size_df['Size'].apply(lambda x: np.log10(x))
+
 
             fig = plt.figure(figsize=figsize)
 
@@ -120,6 +133,7 @@ class DotPlot:
             g.set_xlabel('')
             g.set_ylabel('')
             
+            # Add space for x-axis
             xlim = g.get_xlim()
             space = (xlim[1] - xlim[0]) * 0.1
             g.set_xlim(xlim[0] - space, xlim[1] + space)
@@ -142,8 +156,7 @@ class DotPlot:
             dotsize = np.linspace(math.floor(df['Size'].min()), math.ceil(df['Size'].max()), 4, dtype=int)
             dotsize = np.array(list(OrderedDict.fromkeys(dotsize)))
             scaler = MinMaxScaler(feature_range=sizes)
-            scale_dotsize = scaler.fit_transform(dotsize.reshape(-1, 1)).reshape(-1)
-
+            scale_dotsize = scaler.fit_transform(dotsize.reshape(-1, 1)).reshape(-1)            
             for size, label in zip(scale_dotsize, dotsize):
                 ax3.scatter([], [], c='k', alpha=0.2, s=size, label=f'{label}')
             

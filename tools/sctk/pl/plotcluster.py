@@ -154,7 +154,8 @@ def percent_in_cluster(
 
 def _get_group_data(
     adata, groupby: str, key: str, 
-    subgroups: Dict[str, List[str]] = None, remove_suffix: bool = False):
+    subgroups: Dict[str, List[str]] = None, 
+    remove_suffix: bool = False):
     '''
     Get the percentage of each cell type in each group.
 
@@ -306,6 +307,7 @@ def percent_in_cluster_group(
     subtitle: bool = True,
     figsize: tuple = (8, 4),
     remove_suffix: bool = False,
+    debug: bool = True
 ):
     """
     Calculate the percentage of cells in each cluster group.
@@ -348,4 +350,4 @@ def percent_in_cluster_group(
 
     # Plot the grouped bar charts
     _plot_grouped_bars(
-        adata, df_group, subkeys, key=key, figsize=figsize, subtitle=subtitle)
+        adata, df_group, subkeys, key=key, figsize=figsize, subtitle=subtitle, debug=debug)
