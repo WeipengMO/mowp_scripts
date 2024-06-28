@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import anndata as ad
+import scanpy as sc
+from typing import Union
 
 
 def grouped_obs_mean(adata: ad.AnnData, group_key: str, layer: str = None) -> pd.DataFrame:
@@ -38,6 +40,28 @@ def grouped_obs_mean(adata: ad.AnnData, group_key: str, layer: str = None) -> pd
         out[group] = np.ravel(X.mean(axis=0, dtype=np.float64))
         
     return out
+
+
+def var_means(adata, keys: Union[list, dict], inplace=False, uns: str = 'mean_expression'):
+    if isinstance(keys, list):
+        keys = {'mean_expression': keys}
+    
+    results = []
+    for k, genes in keys.items():
+        common_genes = list(adata.var_names.intersection(genes))
+        if len(common_genes) == 0:
+            raise ValueError(f'No common genes found in {k}.')
+
+        df = sc.get.obs_df(adata, common_genes)
+        df[k] = df.mean(axis=1)
+        results.append(df[[k]])
+    
+    df = pd.concat(results, axis=1)
+
+    if inplace:
+        adata.uns[uns] = df
+    else:
+        return df
 
 
 
