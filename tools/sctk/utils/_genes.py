@@ -88,6 +88,9 @@ def ensemble_to_symbol(ensemble_id: list):
     output : dict
         Dictionary of ensemble id and gene symbol
     """
+    if not isinstance(ensemble_id, list):
+        ensemble_id = list(ensemble_id)
+        
     url = "https://biotools.fr/human/ensembl_symbol_converter/"
     body = {'api': 1, 'ids': json.dumps(ensemble_id)}
     r = requests.post(url, data = body)

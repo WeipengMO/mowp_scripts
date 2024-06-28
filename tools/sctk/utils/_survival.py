@@ -179,4 +179,9 @@ class Survival(ad.AnnData):
             print(f'{results.test_statistic=}')
 
         return ax
+
+    def to_adata(self):
+        adata = ad.AnnData(X=self.X, obs=self.obs, var=self.var)
+        
+        return adata
                 
