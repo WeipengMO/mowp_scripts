@@ -12,10 +12,16 @@ class DotPlot:
     def __init__(
             self, 
             value: pd.DataFrame, 
-            size: pd.DataFrame, 
+            size: pd.DataFrame,
+            reset_index_name: bool = True
         ):
         self.value_df = value.copy()
+        if reset_index_name:
+            self.value_df.index.name = None
+
         self.size_df = size.copy()
+        if reset_index_name:
+            self.size_df.index.name = None
 
     
     @staticmethod
@@ -42,6 +48,8 @@ class DotPlot:
             cbar_title: str = 'Value',
             size_title: str = 'Size',
             rotation: float = None,
+            swap_axes: bool = False,
+            show: bool = True,
             ):
             '''
             Plot a dotplot using the provided data.
@@ -83,9 +91,11 @@ class DotPlot:
             if row_cluster:
                 row_order = self._hierarchical_clustering(self.value_df)
                 self.value_df = self.value_df.loc[row_order]
+                self.size_df = self.size_df.loc[row_order]
             if col_cluster:
                 col_order = self._hierarchical_clustering(self.value_df.T)
                 self.value_df = self.value_df[col_order]
+                self.size_df = self.size_df[col_order]
 
             # Prepare the data for plotting
             df = (self.value_df.reset_index().
@@ -94,6 +104,11 @@ class DotPlot:
             size_df = (self.size_df.reset_index().
                        rename(columns={'index': 'col_names'}).
                        melt(id_vars='col_names', var_name='row_names', value_name='Size'))
+            
+            if reverse_size:
+                df['Size'] = -size_df['Size'].apply(lambda x: np.log10(x))
+            else:
+                df['Size'] = size_df['Size']
 
             if vmax is not None:
                 df['Value'] = df['Value'].clip(upper=vmax)
@@ -104,9 +119,8 @@ class DotPlot:
                 df['Size'] = df['Size'].clip(upper=max_size)
             if min_size is not None:
                 df['Size'] = df['Size'].clip(lower=min_size)
-
-            if reverse_size:
-                df['Size'] = -size_df['Size'].apply(lambda x: np.log10(x))
+            
+            self._scatter_data = df
 
 
             fig = plt.figure(figsize=figsize)
@@ -117,17 +131,23 @@ class DotPlot:
 
             # Scatter plot
             ax1 = fig.add_subplot(gs[:, 0])
+
+            if swap_axes:
+                x, y = 'row_names', 'col_names'
+            else:
+                x, y = 'col_names', 'row_names'
+
             g = sns.scatterplot(
                 data=df, 
-                x='col_names', 
-                y='row_names', 
+                x=x, 
+                y=y, 
                 size='Size', 
                 sizes=sizes, 
                 hue='Value',
                 palette=cmap, 
                 edgecolor="w", 
                 legend=False,
-                ax=ax1
+                ax=ax1,
             )
 
             g.set_xlabel('')
@@ -164,4 +184,7 @@ class DotPlot:
             legend.set_title(size_title, prop={'size': 8})
             ax3.add_artist(legend)
 
-            plt.show()
+            if show:
+                plt.show()
+            else:
+                return g

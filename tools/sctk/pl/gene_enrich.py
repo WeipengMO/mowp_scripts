@@ -3,6 +3,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from adjustText import adjust_text
+from loguru import logger
 
 
 def plot_go_results(
@@ -63,7 +64,8 @@ def plot_volcano(
         fontsize = 8,
         up_color: str = '#d62728',
         down_color: str = '#1f77b4',
-        rest_color: str = 'lightgrey'):
+        rest_color: str = 'lightgrey',
+        set_pvalue: bool = True):
     """
     Plot a volcano plot.
 
@@ -112,6 +114,12 @@ def plot_volcano(
         fig, ax = plt.subplots(figsize = figsize)
 
     df = df.copy()
+    if set_pvalue:
+        logger.info('Setting pvalue to min_pvalue for pvalue == 0')
+        min_pvalue = df[pvalue_key][df[pvalue_key] > 0].min()
+        df.loc[df[pvalue_key] == 0, pvalue_key] = min_pvalue
+
+
     df['nlog10'] = -np.log10(df[pvalue_key])
     log_pvalue_threshold = -np.log10(pvalue_threshold)
     df_up = df[(df[log2fc_key] > log2fc_threshold) & (df.nlog10 > log_pvalue_threshold)]
@@ -145,9 +153,12 @@ def plot_volcano(
         df['log2FoldChange'] = df[log2fc_key]
         for item in df[df.index.isin(gene_list)].itertuples():
             texts.append(
-                plt.text(x = item.log2FoldChange, y = item.nlog10, s = item.Index,
-                fontsize=fontsize, weight = 'bold'))
-        adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'))
+                ax.text(
+                    x = item.log2FoldChange, y = item.nlog10, s = item.Index,
+                    ha='center', va='center',
+                    fontsize=fontsize, weight = 'bold'))
+            
+        adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'), ax=ax)
 
 
     ax.axhline(log_pvalue_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')

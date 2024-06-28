@@ -4,6 +4,7 @@ from .enhanced_scanpy import (
     adjust_heatmap_labels, 
     adjust_groupby_ax, 
     set_adata_color,
-    boxplot)
+    boxplot,
+    violinplot)
 from ._color import ColorMaps, ColorPalette
 from ._dotplot import DotPlot
