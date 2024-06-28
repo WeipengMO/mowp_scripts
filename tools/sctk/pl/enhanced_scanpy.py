@@ -4,6 +4,7 @@ from adjustText import adjust_text
 from ._color import ColorPalette
 from typing import Union
 import scanpy as sc
+import math
 
 
 def adjust_heatmap_labels(ax, gene_to_show: set):
@@ -112,12 +113,128 @@ def set_adata_color(adata, key: str, color_dict: dict = None, palette: Union[lis
 def boxplot(
         adata: sc.AnnData, 
         keys: Union[str, list[str]], 
-        groupby: str, 
+        groupby: str,
+        hue: str = None,
         showfliers=False,
         layer=None,
         use_raw=False,
         palette=None,
         figsize=(4, 4),
+        ncols=3,
+        rotation=45,
+        jitter: float = None,
+        box_kwargs={},
+        strip_kwargs={}):
+    '''
+    Boxplot of adata.obs[key] grouped by adata.obs[groupby]
+
+    Parameters
+    ----------
+    adata
+        An AnnData object.
+    keys
+        Keys for accessing variables of `.var_names` or fields of `.obs`.
+    groupby
+        The `adata.obs` key of the observation grouping to consider.
+    showfliers
+        Show the outliers.
+    layer
+        The layer to use.
+    use_raw
+        Use `adata.raw` for plotting.
+    palette
+        A list of colors or a color palette.
+    figsize
+        The size of the subfigure.
+    sns_kwargs
+        Other keyword arguments for seaborn.boxplot.
+    '''
+    from collections import OrderedDict
+
+
+    if isinstance(keys, str):
+        keys = [keys]
+    keys = list(OrderedDict.fromkeys(keys))  # remove duplicates, preserving the order
+
+    _hue = [] if hue is None else [hue]
+    obs_df = sc.get.obs_df(adata, keys=[groupby] + _hue + keys, layer=layer, use_raw=use_raw)
+    
+    nrows = math.ceil(len(keys)/ncols)
+    fig, axes = plt.subplots(
+        nrows=math.ceil(len(keys)/ncols), ncols=ncols,
+        figsize=(figsize[0]*ncols, figsize[1]*nrows),
+    )
+
+    axes = axes.flatten() if len(keys) > 1 else [axes]
+
+    if palette is None:
+        uns_colors = adata.uns.get(groupby + '_colors')
+        if uns_colors is not None:
+            palette = uns_colors
+
+    for i, key in enumerate(keys):
+        ax = axes[i]
+        sns.boxplot(
+            x=groupby,
+            y=key,
+            hue=hue,
+            data=obs_df,
+            ax=ax,
+            linewidth=1,
+            # fliersize=0,
+            showfliers=showfliers,
+            palette=palette,
+            **box_kwargs,
+        )
+
+        if jitter is not None:
+            sns.stripplot(
+                x=groupby,
+                y=key,
+                hue=hue,
+                data=obs_df,
+                ax=ax,
+                dodge=True,
+                jitter=jitter,
+                color='black',
+                size=1,
+            )
+
+        ax.set_title(key)
+        ax.set_ylabel('')
+        ax.set_xlabel('')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
+        # remove legend
+        ax.get_legend().set_visible(False)
+        sns.despine(ax=ax)
+    
+    for i in range(len(keys), len(axes)):
+        fig.delaxes(axes[i])
+    
+    # Create a legend outside the plot
+    if len(_hue) > 0:
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
+    
+    plt.tight_layout()
+
+    plt.show()
+
+    return axes
+
+
+def violinplot(
+        adata: sc.AnnData, 
+        keys: Union[str, list[str]], 
+        groupby: str,
+        hue: str = None,
+        showfliers=False,
+        layer=None,
+        use_raw=False,
+        palette=None,
+        figsize=(4, 4),
+        ncols=3,
+        rotation=45,
         sns_kwargs={}):
     '''
     Boxplot of adata.obs[key] grouped by adata.obs[groupby]
@@ -150,12 +267,16 @@ def boxplot(
         keys = [keys]
     keys = list(OrderedDict.fromkeys(keys))  # remove duplicates, preserving the order
 
-    obs_df = sc.get.obs_df(adata, keys=[groupby] + keys, layer=layer, use_raw=use_raw)
+    _hue = [] if hue is None else [hue]
+    obs_df = sc.get.obs_df(adata, keys=[groupby] + _hue + keys, layer=layer, use_raw=use_raw)
     
+    nrows = math.ceil(len(keys)/ncols)
     fig, axes = plt.subplots(
-        nrows=1, ncols=len(keys),
-        figsize=(figsize[0]*len(keys), figsize[1]),
+        nrows=math.ceil(len(keys)/ncols), ncols=ncols,
+        figsize=(figsize[0]*ncols, figsize[1]*nrows),
     )
+
+    axes = axes.flatten() if len(keys) > 1 else [axes]
 
     if palette is None:
         uns_colors = adata.uns.get(groupby + '_colors')
@@ -163,25 +284,34 @@ def boxplot(
             palette = uns_colors
 
     for i, key in enumerate(keys):
-        if len(keys) == 1:
-            ax = axes
-        else:
-            ax = axes[i]
-        sns.boxplot(
-            x=groupby, y=key,
+        ax = axes[i]
+        sns.violinplot(
+            x=groupby,
+            y=key,
+            hue=hue,
             data=obs_df,
             ax=ax,
-            linewidth=1,
-            fliersize=0,
-            showfliers=showfliers,
             palette=palette,
             **sns_kwargs,
         )
         ax.set_title(key)
         ax.set_ylabel('')
         ax.set_xlabel('')
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
+        # remove legend
+        ax.get_legend().set_visible(False)
         sns.despine(ax=ax)
+    
+    for i in range(len(keys), len(axes)):
+        fig.delaxes(axes[i])
+    
+    # Create a legend outside the plot
+    if len(_hue) > 0:
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
+    
+    plt.tight_layout()
 
     plt.show()
-    
+
+    return axes
