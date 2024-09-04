@@ -8,3 +8,4 @@ from .enhanced_scanpy import (
     violinplot)
 from ._color import ColorMaps, ColorPalette
 from ._dotplot import DotPlot
+from ._cell_cell_communication import circle_plot
