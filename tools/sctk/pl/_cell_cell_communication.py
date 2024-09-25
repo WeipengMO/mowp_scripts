@@ -348,6 +348,7 @@ def ccc_dotplot(
         data: pd.DataFrame,
         source: str = 'source',
         target: str = 'target',
+        split: str = 'source',
         source_target: str = 'source:target',
         interaction: str = 'interaction',
         source_color: str = 'Set1',
@@ -357,6 +358,10 @@ def ccc_dotplot(
         sort_interaction_accending: bool = True,
         figsize: tuple = (4, 8),
         swap_axes: bool = False,
+        cmap: str = 'RdBu_r',
+        vmax: float = 0.5,
+        vmin: float = 0,
+        legend_gap: int = 3,
         **kwargs,
     ):
     '''
@@ -370,6 +375,8 @@ def ccc_dotplot(
         The column name of the source cell type.
     target : str
         The column name of the target cell type.
+    split : str
+        The column name to split the plot.
     source_target : str
         The column name of the source:target pair.
     interaction : str
@@ -388,6 +395,14 @@ def ccc_dotplot(
         The size of the figure. Default is (4, 8).
     swap_axes : bool
         Whether to swap the axes. Default is False.
+    cmap : str
+        The color map for the plot. Default is 'RdBu_r'.
+    vmax : float
+        The maximum value for the color map. Default is 0.5.
+    vmin : float
+        The minimum value for the color map. Default is 0.
+    legend_gap : int
+        The gap between the legend and the plot. Default is 3.
     '''
     try:
         from PyComplexHeatmap import HeatmapAnnotation, DotClustermapPlotter, anno_simple, anno_label
@@ -400,9 +415,12 @@ def ccc_dotplot(
 
     
     if not swap_axes:
-
         # prepare column annotation
-        df_col = data[[source, target, source_target]].drop_duplicates().set_index(source_target)
+        df_col = (
+            data[[source, target, source_target]].
+            sort_values([source, target]).
+            drop_duplicates().
+            set_index(source_target))
 
         col_ha = HeatmapAnnotation(
             Source=anno_simple(df_col[source], cmap=source_color, legend=True, add_text=False, legend_kws=legend_kws), 
@@ -415,24 +433,30 @@ def ccc_dotplot(
         )
 
         plt.figure(figsize=figsize)
+        if split is not None:
+            split = df_col[split]
         dm = DotClustermapPlotter(
             data=data, 
             x=source_target, y=interaction, # hue='target', 
             value='lr_means',c='lr_means',s='cellphone_pvals',
             row_cluster=False,
             col_cluster=False,
-            cmap='RdBu_r', vmin=0, vmax=.5,
+            cmap=cmap, vmin=vmin, vmax=vmax,
+            
+            # set the column annotation
             top_annotation=col_ha,
+            col_split=split,
+            col_split_gap=1,
 
             # Interactions (ligand -> receptor)
             show_rownames=True,
             row_names_side='left',
             yticklabels_kws={'labelsize': 6},
 
-            y_order=data.sort_values(sort_interaction, ascending=sort_interaction_accending)['interaction'].drop_duplicates().to_list(),
+            y_order=data.sort_values(sort_interaction, ascending=sort_interaction_accending)[interaction].drop_duplicates().to_list(),
 
             verbose=0,
-            legend_gap=7,
+            legend_gap=legend_gap,
             # spines=False,
             # grid='minor',
             **kwargs,
@@ -440,7 +464,11 @@ def ccc_dotplot(
     
     else:
         # prepare row annotation
-        df_row = data[[source, target, source_target]].drop_duplicates().set_index(source_target)
+        df_row = (
+            data[[source, target, source_target]].
+            sort_values([source, target]).
+            drop_duplicates().
+            set_index(source_target))
 
         row_ha = HeatmapAnnotation(
             Source=anno_simple(df_row[source], cmap=source_color, legend=True, add_text=False, legend_kws=legend_kws), 
@@ -453,24 +481,30 @@ def ccc_dotplot(
         )
 
         plt.figure(figsize=figsize)
+        if split is not None:
+            split = df_row[split]
         dm = DotClustermapPlotter(
             data=data, 
             x=interaction, y=source_target, # hue='target', 
             value='lr_means',c='lr_means',s='cellphone_pvals',
             row_cluster=False,
             col_cluster=False,
-            cmap='RdBu_r', vmin=0, vmax=.5,
+            cmap=cmap, vmin=vmin, vmax=vmax,
+
+            # set the row annotation
             left_annotation=row_ha,
+            row_split=split,
+            row_split_gap=1,
 
             # Interactions (ligand -> receptor)
             show_colnames=True,
             col_names_side='bottom',
             xticklabels_kws={'labelsize': 6, 'labelrotation': 30},
 
-            x_order=data.sort_values(sort_interaction, ascending=sort_interaction_accending)['interaction'].drop_duplicates().to_list(),
+            x_order=data.sort_values(sort_interaction, ascending=sort_interaction_accending)[interaction].drop_duplicates().to_list(),
 
             verbose=0,
-            legend_gap=7,
+            legend_gap=legend_gap,
             # spines=False,
             # grid='minor',
             **kwargs,
