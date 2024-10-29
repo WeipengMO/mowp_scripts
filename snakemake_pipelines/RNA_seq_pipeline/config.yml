@@ -2,10 +2,10 @@
 mode: pe
 workdir: .
 
-# sample
-suffix: .fq.gz
-sep: _1
-
 # genome
-genome: /home/mowp/db/mm10/dna/hisat2_index/genome
-ann_gff: /data/user/mowp/db/mm10/gtf/genes.gtf
+genome: /data/user/mowp/db/hg38/chr/hisat2_index/genome
+ann_gff: /data/user/alldata/db/refdata-gex-GRCh38-2020-A/genes/genes.gtf
+
+suffix: .fq.gz
+sep1: _1
+sep2: _2

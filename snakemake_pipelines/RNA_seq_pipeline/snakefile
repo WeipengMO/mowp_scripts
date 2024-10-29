@@ -9,7 +9,8 @@ workdir:
 
 mode = config['mode']
 suffix = config['suffix']
-sep = config['sep']
+sep1 = config['sep1']
+sep2 = config['sep2']
 
 if mode == 'pe':
     snakefile = 'rnaseq_pe.smk'
@@ -25,7 +26,8 @@ include:
     "snakemake/downstream_analysis.smk"
 
 
-sample_name = [os.path.basename(fn.split(sep)[0]) for fn in glob(f'raw_data/*{sep}{suffix}')]
+sample_name = [os.path.basename(fn.split(sep1+suffix)[0]) for fn in glob(f'raw_data/*{sep1}{suffix}')]
+print(sample_name)
 
 # onsuccess:
 #     shell("send.py log -l {log}")
@@ -35,6 +37,7 @@ sample_name = [os.path.basename(fn.split(sep)[0]) for fn in glob(f'raw_data/*{se
 
 rule all:
     input:
+        expand('aligned_data/{sample_name}.sorted.rmdup.bam', sample_name=sample_name),
         expand('stringtie/{sample_name}/{sample_name}.gene.gtf', sample_name=sample_name),
         expand('stringtie/gene_count_matrix.csv', sample_name=sample_name),
         expand('bigwig/{sample_name}.bw', sample_name=sample_name)
