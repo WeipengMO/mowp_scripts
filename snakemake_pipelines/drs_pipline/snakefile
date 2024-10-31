@@ -1,0 +1,99 @@
+from glob import glob
+
+
+configfile: 'config.yml'
+sample = [os.path.basename(fn.split('.bam')[0]) for fn in glob('raw_data/*.bam')]
+
+
+rule all:
+    input:
+        expand('aligned_data/{sample}.sorted.bam', sample=sample),
+        expand('raw_data/{sample}.fastq.gz', sample=sample),
+        expand('modkit_out/{sample}.pileup.bed.gz', sample=sample),
+        expand('modkit_out/{sample}.read_level.tsv.gz', sample=sample)
+
+
+# https://github.com/nanoporetech/dorado/issues/298
+# dorado <commands> | samtools fastq -T "*" | minimap2 -ax map-ont -y ref.fa > some.sam
+rule bam_to_fastq:
+    input:
+        'raw_data/{sample}.bam',
+    output:
+        'raw_data/{sample}.fastq'
+    threads: 8
+    shell:
+        '''
+samtools fastq -@ {threads} -T "*" {input} > {output}
+        '''
+
+
+rule mapping_to_genome:
+    input:
+        'raw_data/{sample}.fastq'
+    output:
+        bam='aligned_data/{sample}.sorted.bam',
+        bai='aligned_data/{sample}.sorted.bam.bai'
+    params:
+        genome=config['genome']
+    threads: 36
+    shell:
+        '''
+minimap2 -t {threads} -ax splice -uf -k14 --secondary=no -y {params.genome} {input} | samtools sort -@ {threads} -o {output.bam} -
+samtools index -@ {threads} {output.bam}
+        '''
+
+
+rule pgzip_fastq:
+    input:
+        bam='aligned_data/{sample}.sorted.bam',
+        fq='raw_data/{sample}.fastq'
+    output:
+        'raw_data/{sample}.fastq.gz'
+    threads: 8
+    shell:
+        '''
+pigz -p {threads} {input.fq}
+        '''
+
+
+rule modkit_pileup:
+    input:
+        'aligned_data/{sample}.sorted.bam'
+    output:
+        'modkit_out/{sample}.pileup.bed'
+    params:
+        genome=config['genome']
+    threads: 32
+    shell:
+        '''
+modkit pileup {input} {output} -t {threads} --motif DRACH 2 --ref {params.genome}
+        '''
+
+
+rule modkit_extract:
+    input:
+        'aligned_data/{sample}.sorted.bam'
+    output:
+        'modkit_out/{sample}.read_level.tsv.gz'
+    params:
+        genome=config['genome'],
+        modkit_out='modkit_out/{sample}.read_level.tsv'
+    threads: 32
+    shell:
+        '''
+modkit extract -t 30 --mapped-only --reference {params.genome} --read-calls {params.modkit_out} --motif DRACH 2 {input} null
+bgzip -@ {threads} {params.modkit_out}
+        '''
+
+rule bgzip_read_level:
+    input:
+        'modkit_out/{sample}.pileup.bed'
+    output:
+        'modkit_out/{sample}.pileup.bed.gz'
+    threads: 16
+    conda: 'rnaseq'
+    shell:
+        '''
+bgzip -@ {threads} {input}
+tabix -p bed {input}.gz
+        '''
