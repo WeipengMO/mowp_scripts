@@ -1,6 +1,7 @@
 import requests
 from loguru import logger
 import json
+import pandas as pd
 
 
 def convert_gene_symbol(genes: str, species='human'):
@@ -97,3 +98,22 @@ def ensemble_to_symbol(ensemble_id: list):
     output = r.json()
 
     return output
+
+
+def gmt_to_dc(pth: str) -> pd.DataFrame:
+    """
+    Parse a gmt file to a decoupler pathway dataframe.
+    """
+    from itertools import chain, repeat
+
+    pathways = {}
+
+    with open(pth, "r") as f:
+        for line in f:
+            name, _, *genes = line.strip().split("\t")
+            pathways[name] = genes
+
+    return pd.DataFrame.from_records(
+        chain.from_iterable(zip(repeat(k), v) for k, v in pathways.items()),
+        columns=["geneset", "genesymbol"],
+    )
