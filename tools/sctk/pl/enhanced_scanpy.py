@@ -159,6 +159,7 @@ def boxplot(
     _hue = [] if hue is None else [hue]
     obs_df = sc.get.obs_df(adata, keys=[groupby] + _hue + keys, layer=layer, use_raw=use_raw)
     
+    ncols = min(ncols, len(keys))
     nrows = math.ceil(len(keys)/ncols)
     fig, axes = plt.subplots(
         nrows=math.ceil(len(keys)/ncols), ncols=ncols,
@@ -198,6 +199,7 @@ def boxplot(
                 jitter=jitter,
                 color='black',
                 size=1,
+                **strip_kwargs,
             )
 
         ax.set_title(key)
@@ -205,7 +207,8 @@ def boxplot(
         ax.set_xlabel('')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
         # remove legend
-        ax.get_legend().set_visible(False)
+        if hue is not None:
+            ax.get_legend().set_visible(False)
         sns.despine(ax=ax)
     
     for i in range(len(keys), len(axes)):
@@ -218,7 +221,7 @@ def boxplot(
     
     plt.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     return axes
 

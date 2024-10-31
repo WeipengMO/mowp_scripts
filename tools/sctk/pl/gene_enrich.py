@@ -7,8 +7,17 @@ from loguru import logger
 
 
 def plot_go_results(
-        df: pd.DataFrame, pvalue_key: str = 'p.adjust', 
-        top: int = 10, ax = None, title: str = None, color: str = None):
+        df: pd.DataFrame, 
+        pvalue: str, 
+        term: str,
+        top_n: int = 10, 
+        ax = None, 
+        title: str = None, 
+        color: str = None,
+        figsize: tuple = (5, 5),
+        fontsize: int = 8,
+        xlabel: str = 'log(pvalue)',
+        **kwargs):
     """
     Plot the top GO results.
 
@@ -16,9 +25,11 @@ def plot_go_results(
     ----------
     df
         The GO results dataframe.
-    pvalue_key
+    pvalue
         The key of the pvalue column.
-    top
+    term
+        The key of the term column.
+    top_n
         The number of top GO terms to plot.
     ax
         The axes object to plot on.
@@ -33,17 +44,34 @@ def plot_go_results(
         The axes object.
     """
     df = df.copy()
-    df['-log10(pvalue)'] = -np.log10(df[pvalue_key])
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(5, 5))
-    if color is None:
-        color = '#3274a1'
-    sns.barplot(
-        data=df.head(top), x='-log10(pvalue)', y='Description', 
-        color=color, ax=ax)
+    df['-log10(pvalue)'] = -np.log10(df[pvalue])
+    if term == 'index':
+        df['term'] = df.index
+        term = 'term'
 
-    ax.set_xlabel('-log10(pvalue)')
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    sns.barplot(
+        data=df.head(top_n), x='-log10(pvalue)', y=term, 
+        color=color, 
+        ax=ax,
+        **kwargs)
+    
+    for text in ax.get_yticklabels():
+        plt.text(
+            text.get_position()[0], 
+            text.get_position()[1], 
+            text.get_text(), 
+            fontsize=fontsize, 
+            ha='left', 
+            va='center'
+        )
+        
+    ax.set_yticks([])
+
+    ax.set_xlabel(xlabel)
     ax.set_ylabel('')
+
     sns.despine(ax=ax)
     if title is not None:
         ax.set_title(title)
