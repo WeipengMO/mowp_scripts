@@ -47,10 +47,14 @@ bamCompare -b1 {input.treatment} -b2 {input.control} -o {output} --binSize 10 --
         '''
 
 import yaml
-replicate_data = config['replicate']
+try:
+    replicate_data = config['replicate']
+    with open(replicate_data, 'r') as f:
+        replicate_data = yaml.load(f, Loader=yaml.Loader)
+except KeyError:
+    print('Please provide replicate data in the config file if you want to run the replicate_intersect rule.')
+    replicate_data = None
 
-with open(replicate_data, 'r') as f:
-    replicate_data = yaml.load(f, Loader=yaml.Loader)
 
 def replicate_intersect_input(wildcard):
     wildcard = str(wildcard)
