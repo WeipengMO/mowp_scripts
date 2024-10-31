@@ -7,12 +7,18 @@ from ..utils import rtools, configure_logger
 from loguru import logger
 import seaborn as sns
 from matplotlib import pyplot as plt 
+import multiprocessing
+
+
+def _run_leiden(adata, resolution):
+    ad = sc.tl.leiden(adata, resolution=resolution, key_added=f"leiden_{resolution}", copy=True)
+    return ad
 
 
 def leiden_iter(
         adata: sc.AnnData, 
         res_start: float = .1, 
-        res_end: float = 1.5, 
+        res_end: float = 1, 
         res_step: float = .1):
     """Iterate over Leiden resolutions.
 
@@ -28,11 +34,14 @@ def leiden_iter(
         Resolution step size.
     """
 
-    resolution = np.arange(res_start, res_end+res_step, res_step)
-    resolution = [round(i, 2) for i in resolution]
+    resolutions = np.arange(res_start, res_end+res_step, res_step)
+    resolutions = [round(i, 2) for i in resolutions]
 
-    for res in tqdm(resolution, desc="Leiden clustering"):
-        sc.tl.leiden(adata, resolution=res, key_added=f"leiden_{res}")
+    with multiprocessing.Pool(processes=len(resolutions)) as pool:
+        results = pool.starmap(_run_leiden, [(adata, res) for res in resolutions])
+    
+    for ad, res in zip(results, resolutions):
+        adata.obs = adata.obs.merge(ad.obs[[f'leiden_{res}']], left_index=True, right_index=True)
 
 
 
