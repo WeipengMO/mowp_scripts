@@ -9,3 +9,6 @@ ann_gff: /data/user/alldata/db/refdata-gex-GRCh38-2020-A/genes/genes.gtf
 suffix: .fq.gz
 sep1: _1
 sep2: _2
+
+# software
+picard_path: /data/software/picard.jar

@@ -52,10 +52,12 @@ rule MarkDuplicates:
         bam='aligned_data/{sample_name}.sorted.rmdup.bam',
         bai='aligned_data/{sample_name}.sorted.rmdup.bam.bai'
     threads: 8
+    params:
+        picard=config['picard_path']
     conda: 'rnaseq'
     log:
         'logs/picard/{sample_name}.log'
     shell:
         '''
-java -jar /data/software/picard.jar MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt &> {log} && samtools index {output.bam}
+java -jar {params.picard} MarkDuplicates REMOVE_DUPLICATES=true SORTING_COLLECTION_SIZE_RATIO=0.01 I={input} O={output.bam} M={output.bam}.markdump.txt &> {log} && samtools index {output.bam}
         '''
