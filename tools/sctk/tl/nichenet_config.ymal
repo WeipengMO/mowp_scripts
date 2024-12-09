@@ -1,0 +1,9 @@
+human:
+    lr_network: /data/user/mowp/db/nichenet/lr_network_human_21122021.rds
+    ligand_target_matrix: /data/user/mowp/db/nichenet/ligand_target_matrix_nsga2r_final.rds
+    weighted_networks: /data/user/mowp/db/nichenet/weighted_networks_nsga2r_final.rds
+
+mouse:
+    lr_network: /data/user/mowp/db/nichenet/lr_network_mouse_21122021.rds
+    ligand_target_matrix: /data/user/mowp/db/nichenet/ligand_target_matrix_nsga2r_final_mouse.rds
+    weighted_networks: /data/user/mowp/db/nichenet/weighted_networks_nsga2r_final_mouse.rds
