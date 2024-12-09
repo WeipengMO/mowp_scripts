@@ -10,7 +10,9 @@ R = ro.r
 @rcontext
 def _load_prior_knowledge(organism, rEnv=None):
     import yaml
-    with open('tl/nichenet_config.ymal') as f:
+    import os
+
+    with open(os.path.dirname(__file__)+'/nichenet_config.ymal') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     config = config[organism]
     lr_network, ligand_target_matrix, weighted_networks = (
@@ -23,12 +25,11 @@ def _load_prior_knowledge(organism, rEnv=None):
         ligand_target_matrix <- readRDS('{ligand_target_matrix}')
         weighted_networks <- readRDS('{weighted_networks}')
     ''')
-
-
+  
 
 @rcontext
 def run_nichenetr(
-        adata: sc.AnnData,
+        seuratObj,
         organism: str,
         sender_celltypes: list,
         receiver_celltypes: str,
@@ -36,7 +37,6 @@ def run_nichenetr(
         condition_oi: str,
         condition_reference: str,
         expression_pct = 0.1,
-        cell_type_key: str = None,
         geneset: str = 'DE',
         lfc_cutoff: float = 0.25,
         rEnv=None,
@@ -45,8 +45,8 @@ def run_nichenetr(
 
     Parameters
     ----------
-    adata : AnnData
-        Annotated data matrix.
+    seuratObj : Seurat object
+        Seurat object.
     cell_type_key : str
         Key in adata.obs that contains cell type information.
     organism : str
@@ -72,18 +72,10 @@ def run_nichenetr(
     importr('nichenetr')
     importr('tidyverse')
 
-    if isinstance(adata, sc.AnnData):
-        if cell_type_key is None:
-            raise ValueError('cell_type_key must be specified.')
-        
-        seuratObj = rtools.ad2so(adata, layer='counts')
-        rEnv['seuratObj'] = seuratObj
-        R(f"Idents(object = seuratObj) <- '{cell_type_key}'")
-    elif isinstance(adata, ro.methods.RS4) and rtools.r2py(R('class')(adata))[0] == 'Seurat':
-        seuratObj = adata
+    if isinstance(seuratObj, ro.methods.RS4) and rtools.r2py(R('class')(seuratObj))[0] == 'Seurat':
         rEnv['seuratObj'] = seuratObj
     else:
-        raise ValueError('adata must be either a Seurat object or an AnnData object.')
+        raise ValueError('adata must be either a Seurat object.')
     
 
     rEnv['sender_celltypes'] = rtools.py2r(sender_celltypes)
