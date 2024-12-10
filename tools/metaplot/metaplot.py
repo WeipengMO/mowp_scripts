@@ -7,11 +7,14 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 import pysam
 import scipy
+from scipy import ndimage
+import math
+# from utils import get_methyratio_within_bin
 
 
 def get_bin_cov(data: list, bins: int):
     data = np.array(data)
-    data = np.nan_to_num(data)
+    # data = np.nan_to_num(data)
     
     if bins == 1:
         return data
@@ -21,8 +24,11 @@ def get_bin_cov(data: list, bins: int):
     results = []
     for i in range(0, len(data), bins):
         bin_data = data[i:i + bins]
-        mean_bin_data = np.nanmean(bin_data)
-        results.append(mean_bin_data)
+        if np.isnan(bin_data).all():
+            results.append(np.nan)
+        else:
+            mean_bin_data = np.nanmean(bin_data)
+            results.append(mean_bin_data)
 
     return results
 
@@ -39,7 +45,8 @@ def bw_site_cov(
     bins: int = 100,
     chrom_prefix: str = '',
     normalized: str = 'density',
-    exclude_chr = None
+    exclude_chr = None,
+    min_coverage: float = 0.0,
     ):
     '''
     Args:
@@ -91,10 +98,12 @@ def bw_site_cov(
     else:
         return ValueError('strand must be "+" or "-"')
     
-    cov = np.nan_to_num(cov)
-    if sum(cov) > 0:
+    # cov = np.nan_to_num(cov)
+    if np.nansum(cov) > min_coverage:
         if normalized == 'density':
-            cov = cov / sum(cov)  # density
+            cov = cov / np.nansum(cov)  # density
+        elif normalized == 'max':
+            cov = cov / np.nanmax(cov)
         return cov
 
     
@@ -106,13 +115,16 @@ def bw_reference_point(
     chrom_prefix: str = '',
     normalized: str = 'density',
     exclude_chr = None,
+    min_coverage: float = 0.0,
+    return_raw: bool = False,
+    scale: bool = False,
     threads=64):
     '''
     Reference-point refers to a position within a BED region (e.g., the starting point). In this mode, only those genomicpositions before (upstream) and/or after (downstream) of the reference point will be used.
 
     Args:
         infile: path to bigWig file
-        site_info: [(chrom, site1, site2, strand), ...]
+        site_info: [(chrom, site, strand), ...]
         before: distance upstream of the site1 selected
         after: distance downstream of the site2 selected
         bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
@@ -139,15 +151,27 @@ def bw_reference_point(
             repeat(chrom_prefix),
             repeat(normalized),
             repeat(exclude_chr),
+            repeat(min_coverage),
             chunksize=chunksize)
 
     cov = []
+    n = 0
     for cov_ in results:
         if cov_ is not None:
             cov.append(cov_)
+            n += 1
 
-    cov = np.nanmean(cov, axis=0)
-    return cov
+    cov = np.array(cov)
+    if scale:
+        cov = cov * (before + after) / bins
+    
+    if not return_raw:
+        cov = np.nanmean(cov, axis=0)
+        return cov
+    else:
+        raw_cov = cov
+        cov = np.nanmean(cov, axis=0)
+        return cov, raw_cov
 
 
 # scale region
@@ -159,7 +183,8 @@ def bw_scale_cov(
     split: bool = False,
     chrom_prefix: str = '',
     normalized: str = 'density',
-    exclude_chr = None
+    exclude_chr = None,
+    min_coverage: float = 0.0,
     ):
     '''
     Args:
@@ -265,11 +290,11 @@ def bw_scale_cov(
             raise ValueError('strand must be "-" or "+"')
 
         cov = np.concatenate([cov_5, cov_gb, cov_3])
-        cov = np.nan_to_num(cov)
+        # cov = np.nan_to_num(cov)
 
-        if sum(cov) > 0:
+        if np.nansum(cov) > min_coverage:
             if normalized == 'density':
-                cov = cov / sum(cov)  # density
+                cov = cov / np.nansum(cov)  # density
             return cov
 
 
@@ -282,6 +307,8 @@ def bw_scale_regions(
     chrom_prefix: str = '',
     normalized: str = 'density',
     exclude_chr = None,
+    min_coverage: float = 0.0,
+    return_raw: bool = False,
     threads=64):
     '''
     In the scale-regions mode, all regions in the BED file are stretched or shrunken to the length (in bases) indicated by the user.
@@ -307,7 +334,7 @@ def bw_scale_regions(
     strand = site_info[:, 3]
 
     with ProcessPoolExecutor(max_workers=threads) as e:
-        chunksize = int(len(site_info) / threads)
+        chunksize = math.ceil(len(site_info) / threads)
         results = e.map(
             bw_scale_cov,
             repeat(infile),
@@ -323,6 +350,7 @@ def bw_scale_regions(
             repeat(chrom_prefix),
             repeat(normalized),
             repeat(exclude_chr),
+            repeat(min_coverage),
             chunksize=chunksize)
 
     if split:
@@ -335,14 +363,21 @@ def bw_scale_regions(
 
         cov_5 = np.nanmean(cov_5, axis=0)
         cov_3 = np.nanmean(cov_3, axis=0)
+
         return cov_5, cov_3
 
     else:
         cov = []
+        n = 0
         for cov_ in results:
             if cov_ is not None:
                 cov.append(cov_)
+                n += 1
 
+        print(f'n = {n}')
+        if return_raw:
+            return cov
+            
         cov = np.nanmean(cov, axis=0)
         return cov
 
@@ -671,8 +706,8 @@ def bam_scale_region(
                 cov_5.append(cov_5_)
                 cov_3.append(cov_3_)
 
-        cov_5 = np.nanmean(cov_5, axis=0)
-        cov_3 = np.nanmean(cov_3, axis=0)
+        cov_5 = np.nanmean(cov_5, axis=0) / bins
+        cov_3 = np.nanmean(cov_3, axis=0) / bins
         
         return cov_5, cov_3
 
@@ -682,7 +717,7 @@ def bam_scale_region(
             if res is not None:
                 cov.append(res)
         
-        cov = np.nanmean(cov, axis=0)
+        cov = np.nanmean(cov, axis=0) / bins
         return cov
 
 
@@ -758,3 +793,162 @@ def set_ax(
         ax[1].set_xticks([0, b2//bins, (a2+b2)//bins])
         ax[1].set_xticklabels([f'-{b2//1000} kb', site2, f'{a2//1000} kb'], rotation=90)
         ax[1].axvline(b2//bins, ls='--', color='#555555')
+
+
+def metaplot_cen(
+    infile: str, 
+    cen_region: dict,
+    extend: int = 100_000,
+    flank_bin: int = 20,  # number of bins to use for the flanking regions
+    cen_bin: int = 20,  # number of bins to use for the centromere region
+    ignore_nan: bool = False,
+    blacklist: dict = None,
+    canonical: int = 11,
+    modification: int = 12,
+    threads=64):
+
+    flank_bin += 1
+    cen_bin += 1
+
+    results = []
+    for chrom in cen_region:
+        
+        start, end = cen_region[chrom]
+        cov5_pos = np.linspace(start-extend-1, start-1, flank_bin, dtype=int)
+
+        cov5_mask = np.zeros(len(cov5_pos), dtype=bool)
+        if blacklist is not None and chrom in blacklist:
+            for b in blacklist[chrom]:
+                cov5_mask[np.logical_and(cov5_pos > b[0], cov5_pos < b[1])] = True
+
+        cov3_pos = np.linspace(end, end+extend-1, flank_bin, dtype=int)
+        cen_pos = np.linspace(start, end-1, cen_bin, dtype=int)
+
+        with ProcessPoolExecutor(max_workers=threads) as e:
+            chunksize = math.ceil((len(cov5_pos)-1) / threads)
+            res = e.map(
+                get_methyratio_within_bin, repeat(infile), repeat(chrom), cov5_pos[ :-1], cov5_pos[1: ]-1, repeat(canonical), repeat(modification), chunksize=chunksize)
+
+        cov5 = np.array(list(res))
+        cov5[cov5_mask[:-1]] = np.nan  # mask blastlist regions
+        cov5 = list(cov5)
+
+        with ProcessPoolExecutor(max_workers=threads) as e:
+            chunksize = math.ceil((len(cov3_pos)-1) / threads)
+            res = e.map(
+                get_methyratio_within_bin, repeat(infile), repeat(chrom), cov3_pos[ :-1], cov3_pos[1: ]-1, repeat(canonical), repeat(modification), chunksize=chunksize)
+        cov3 = list(res)
+
+        with ProcessPoolExecutor(max_workers=threads) as e:
+            chunksize = math.ceil((len(cen_pos)-1) / threads)
+            res = e.map(
+                get_methyratio_within_bin, repeat(infile), repeat(chrom), cen_pos[ :-1], cen_pos[1: ]-1, repeat(canonical), repeat(modification), chunksize=chunksize)
+        cen = list(res)
+
+        res = np.array(cov5 + cen + cov3)
+        if ignore_nan:
+            res[res == None] = np.nan
+            
+        results.append(res)
+    
+    # return results
+    cov = np.nanmean(results, axis=0)
+    return cov
+
+
+# scale region
+def bw_scale_cov2(
+    infile: str, 
+    chrom: str, site1: int, site2: int, strand: str,
+    before: int = 1000, after : int = 1000, regionbody : int = 1000, 
+    binsize: int = 100,
+    chrom_prefix: str = '',
+    normalized: str = 'density',
+    exclude_chr = None,
+    min_coverage: float = 0.0,
+    ):
+    '''
+    Args:
+        infile: path to tabix file
+        chrom: chromosome name
+        site1: 5' site
+        site2: 3' site
+        strand: '+' or '-'
+        before: distance upstream of the site1 selected
+        after: distance downstream of the site2 selected
+        regionbody: distance in bases to which all regions will be fit
+        bins: length in bases, of the non-overlapping bins for averaging the score over the regions length
+        chrom_prefix: prefix of the chromosome name, eg. "chr"
+        normalized: normalization method, 'density' or 'count'
+        exclude_chr: chromosomes to be excluded
+    
+    Return:
+        cov: the coverage value of givin regions
+    '''
+    site1 = int(site1)
+    site2 = int(site2)
+    chrom = str(chrom)
+
+    if exclude_chr is not None and chrom in exclude_chr:
+        return
+
+    chrom = chrom_prefix + chrom
+
+    bwfile = pysam.open(infile)
+    if strand == '+':
+        start = site1 - before
+        end = site2 + after
+    else:
+        start = site1 - after
+        end = site2 + before
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        # remove Invalid interval
+        return
+
+    if strand == '+':
+        start = site1 - before
+        end = site2 + after
+    else:
+        start = site1 - after
+        end = site2 + before
+    
+    if start < 0 or end > bwfile.chroms()[chrom]:
+        return
+
+    if strand == '+':
+        cov_5 = bwfile.values(chrom, start, site1)
+        cov_5 = get_bin_cov(cov_5, binsize)
+        cov_3 = bwfile.values(chrom, site2, end)
+        cov_3 = get_bin_cov(cov_3, binsize)
+        # gene_body_region
+        cov_gb = bwfile.values(chrom, site1, site2)
+        cov_gb = scipy.ndimage.zoom(
+            cov_gb,
+            regionbody / len(cov_gb),
+            order=0,
+            mode='nearest')
+        cov_gb = get_bin_cov(cov_gb, binsize)
+
+    elif strand == '-':
+        cov_5 = bwfile.values(chrom, site2, end)[::-1]
+        cov_5 = get_bin_cov(cov_5, binsize)
+        cov_3 = bwfile.values(chrom, start, site1)[::-1]
+        cov_3 = get_bin_cov(cov_3, binsize)
+        # gene_body_region
+        cov_gb = bwfile.values(chrom, site1, site2)[::-1]
+        cov_gb = scipy.ndimage.zoom(
+            cov_gb,
+            regionbody / len(cov_gb),
+            order=0,
+            mode='nearest')
+        cov_gb = get_bin_cov(cov_gb, binsize)
+    else:
+        raise ValueError('strand must be "-" or "+"')
+
+    cov = np.concatenate([cov_5, cov_gb, cov_3])
+    # cov = np.nan_to_num(cov)
+
+    if np.nansum(cov) > min_coverage:
+        if normalized == 'density':
+            cov = cov / np.nansum(cov)  # density
+        return cov
