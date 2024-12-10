@@ -608,7 +608,7 @@ def so2md(so, rEnv=None, verbose=0, **kwargs):
 
 
 @rcontext
-def ad2cds(adata, layer: str = 'counts', rEnv=None, verbose=0, **kwargs):
+def ad2cds(adata, layer: str = 'counts', cell_type_key: str = 'cell_type', rEnv=None, verbose=0, **kwargs):
     """Convert an AnnData object to a CellDataSet object
 
     https://github.com/satijalab/seurat/issues/2833
@@ -637,10 +637,14 @@ def ad2cds(adata, layer: str = 'counts', rEnv=None, verbose=0, **kwargs):
 
     cell_metadata = adata.obs.copy()
     cell_metadata['barcode'] = cell_metadata.index
-    cell_metadata = cell_metadata[['barcode']]
+    # cell_metadata = cell_metadata[['barcode']]
 
     expression_matrix = adata.layers[layer].T
-    cell_type = adata.obs['cell_type'].values
+    try:
+        cell_type = adata.obs[cell_type_key].values
+    except KeyError:
+        raise KeyError(f'{cell_type_key} not in adata.obs')
+    
     umap = pd.DataFrame(adata.obsm['X_umap'], columns=['UMAP_1', 'UMAP_2'], index=adata.obs.index)
     pca = pd.DataFrame(
         adata.obsm['X_pca'], 
