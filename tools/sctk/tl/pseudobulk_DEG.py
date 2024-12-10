@@ -47,12 +47,11 @@ def create_pseudo_bulk(
     """
 
     assert counts_key in cell_subset.layers.keys(), f"counts_key {counts_key} not found in cell_subset.layers.keys()"
+    cell_subset.X = cell_subset.layers[counts_key]
 
     pbs = []
     for sample in cell_subset.obs[sample_key].unique():
         samp_cell_subset = cell_subset[cell_subset.obs[sample_key] == sample]
-        
-        samp_cell_subset.X = samp_cell_subset.layers[counts_key] #make sure to use raw data
         
         indices = list(samp_cell_subset.obs_names)
         if len(indices) < n_cells * n_pseudo_replicates:
