@@ -10,4 +10,7 @@ from ._clustermap import ClusterMap
 from ._utils import (
     grouped_obs_mean,
     var_means)
-from ._nichenetr import run_nichenetr
+from ._nichenetr import (
+    run_nichenet_soj,
+    _load_prior_knowledge,
+    predict_ligand_activities)
