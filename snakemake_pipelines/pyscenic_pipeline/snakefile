@@ -19,7 +19,7 @@ rule adata_to_loom:
     output: 'input_loom/{sample}.input.loom'
     conda: 'sc'
     log: 'logs/ad2loom.{sample}.log'
-    shell: 'python adata_to_loom.py {input} {output} &> {log}'
+    shell: 'python adata_to_loom.py {input} {output} --layer counts &> {log}'
 
 
 rule grn:
