@@ -151,3 +151,69 @@ def filter_gsea_res(enrich_dict, pvalue_key='FDR p-value', pvalue_threshold=0.05
     enrich_df = enrich_df[enrich_df['Term'].isin(term_list)]
     
     return enrich_df
+
+
+def run_ora(
+        results_dict: dict, 
+        gene_sets: pd.DataFrame, # msigdb
+        foldchange_key = 'log2FoldChange',
+        pvalue_key = 'pvalue',
+        source: str ='geneset', 
+        target: str ='genesymbol', 
+        enrich_dict: dict = None, 
+        fold_change_threshold: float = 1, 
+        pvalue_threshold: float = 0.05):
+
+    return_results = False
+    if enrich_dict is None:
+        enrich_dict = {}
+        return_results = True
+
+    for res in results_dict:
+        de = results_dict[res].set_index('gene')
+
+        enr_list = []
+        for change in ('down', 'up'):
+            if change == 'down':
+                top_genes = de[(de[pvalue_key] < pvalue_threshold) & (de[foldchange_key] < -fold_change_threshold)]
+            else:
+                top_genes = de[(de[pvalue_key] < pvalue_threshold) & (de[foldchange_key] > fold_change_threshold)]
+
+            # Run ora
+            enr_pvals = dc.get_ora_df(
+                df=top_genes,
+                net=gene_sets,
+                source=source,
+                target=target
+            )
+
+            enr_pvals['cell_type'] = res.split(' | ')[0]
+            enr_pvals['compare'] = res.split(' | ')[1]
+            enr_pvals['change'] = change
+            enr_list.append(enr_pvals)
+
+        enrich_dict[res] = pd.concat(enr_list)
+    
+    if return_results:
+        return enrich_dict
+    
+
+def filter_ora_res(enrich_dict, pvalue_key='FDR p-value', pvalue_threshold=0.01, n_top=5):
+    concat_list = []
+    term_list = []
+    for res in enrich_dict:
+        for fold_change in ('down', 'up'):
+            mask = (enrich_dict[res][pvalue_key] < pvalue_threshold) & (enrich_dict[res]['change'] == fold_change)
+            ora_df = enrich_dict[res][mask].copy()
+            ora_df.sort_values(pvalue_key, ascending=True, inplace=True)
+
+            term = ora_df.head(n_top)['Term']
+            term_list.extend(term)
+
+            concat_list.append(ora_df)
+
+    enrich_df = pd.concat(concat_list)
+    term_list = list(set(term_list))
+    enrich_df = enrich_df[enrich_df['Term'].isin(term_list)]
+    
+    return enrich_df

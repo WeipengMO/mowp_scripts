@@ -174,7 +174,7 @@ def plot_volcano(
             gene_list = list(_df_sorted.index[:n_top//2]) + list(_df_sorted.index[-n_top//2:])
         else:
             _df_sorted = _df.sort_values(pvalue_key)
-            gene_list = list(_df_sorted.index[:n_top])
+            gene_list = list(_df_sorted[_df_sorted[log2fc_key] > 0].index[:n_top//2]) + list(_df_sorted[_df_sorted[log2fc_key] < 0].index[:n_top//2])
         
     if len(gene_list) > 0:
         texts = []
@@ -196,5 +196,108 @@ def plot_volcano(
     plt.xlabel("$\mathrm{log_{2}}$(fold change)")
     plt.ylabel("-$\mathrm{log_{10}}$(p-value)")
     sns.despine()
+
+    return ax
+
+
+def plot_gsea_bar(
+        enr: pd.DataFrame, 
+        pvalue_key='FDR p-value', 
+        pvalue_threshold=0.05,
+        both_directions=True,
+        n_top=10,
+        fontsize=8,
+        figsize = None,
+        title: str = '',
+        bar_color: str = 'lightblue'):
+    
+    enr = enr[enr[pvalue_key] < pvalue_threshold].copy()
+    if both_directions:
+        enr1 = enr[enr['NES'] > 0].sort_values('NES', ascending=False).head(n_top//2)
+        enr2 = enr[enr['NES'] < 0].sort_values('NES', ascending=True).head(n_top//2)
+        top_results = pd.concat([enr1, enr2])
+    else:
+        top_results = enr.sort_values('NES', ascending=False).head(n_top)
+    
+    if figsize is None:
+        figsize = (6, 0.5 * len(top_results))
+    elif isinstance(figsize, tuple) and len(figsize) == 2:
+        pass
+    else:
+        figsize = (figsize, 0.6 * len(top_results))
+
+    plt.figure(figsize=figsize)
+    plt.barh(top_results['Term'], top_results['NES'], color=bar_color)
+    plt.xlabel('Normalized Enrichment Score (NES)', fontsize=12)
+    plt.title(title)
+    ylim = plt.ylim()
+    plt.ylim(ylim[::-1])
+
+    ax = plt.gca()
+    for text, nes in zip(ax.get_yticklabels(), top_results['NES']):
+        ha = 'left' if nes > 0 else 'right'
+        plt.text(
+            text.get_position()[0], text.get_position()[1], text.get_text(), 
+            fontsize=fontsize, ha=ha, va='center')
+    ax.set_yticks([])
+    ax.set_ylabel('')
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    return ax
+
+
+def plot_ora_bar(
+        enr: pd.DataFrame, 
+        pvalue_key='FDR p-value', 
+        pvalue_threshold=0.05,
+        both_directions=True,
+        n_top=10,
+        fontsize=8,
+        figsize = None,
+        title: str = '',
+        bar_color: str = 'lightblue'):
+    
+    enr = enr[enr[pvalue_key] < pvalue_threshold].copy()
+    # remove duplicates item
+    enr.sort_values(pvalue_key, ascending=True, inplace=True)
+    enr.drop_duplicates('Term', keep='first', inplace=True)
+    
+    if both_directions:
+        enr1 = enr[enr['change'] == 'up'].sort_values('Odds ratio', ascending=False).head(n_top//2)
+        enr2 = enr[enr['change'] == 'down'].sort_values('Odds ratio', ascending=False).head(n_top//2)
+        enr2['Odds ratio'] = -enr2['Odds ratio']
+        top_results = pd.concat([enr1, enr2])
+    else:
+        top_results = enr.sort_values('NES', ascending=False).head(n_top)
+    
+    if figsize is None:
+        figsize = (6, 0.3 * len(top_results))
+    elif isinstance(figsize, tuple) and len(figsize) == 2:
+        pass
+    else:
+        figsize = (figsize, 0.3 * len(top_results))
+
+    plt.figure(figsize=figsize)
+    plt.barh(top_results['Term'], top_results['Odds ratio'], color=bar_color)
+    plt.xlabel('Odds ratio', fontsize=12)
+    plt.title(title)
+    ylim = plt.ylim()
+    plt.ylim(ylim[::-1])
+
+    ax = plt.gca()
+    for text, nes in zip(ax.get_yticklabels(), top_results['Odds ratio']):
+        ha = 'left' if nes > 0 else 'right'
+        plt.text(
+            text.get_position()[0], text.get_position()[1], text.get_text(), 
+            fontsize=fontsize, ha=ha, va='center')
+    ax.set_yticks([])
+    ax.set_ylabel('')
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
 
     return ax
