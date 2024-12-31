@@ -48,7 +48,8 @@ def leiden_iter(
 def clustree(
         adata: sc.AnnData,
         prefix: str = 'leiden',
-        figsize: tuple = (1000, 2000),
+        figsize: tuple = (600, 600),
+        dpi=75,
         ):
     """Plot clustree of Leiden clusters.
 
@@ -66,7 +67,7 @@ def clustree(
     pattern = f"{prefix}_\d+\.\d+"
     leien_cluster_r = rtools.py2r(adata.obs.filter(regex=pattern))
 
-    with rtools.r_inline_plot(*figsize, dpi=100):
+    with rtools.r_inline_plot(*figsize, dpi=dpi):
         print(clustree_r.clustree(leien_cluster_r, prefix=f'{prefix}_'))
 
 
