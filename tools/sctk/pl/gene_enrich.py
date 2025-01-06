@@ -90,49 +90,59 @@ def plot_volcano(
         ax = None,
         figsize = (4, 4),
         fontsize = 8,
+        fontweight = 'bold',
+        dotsize = 15,
         up_color: str = '#d62728',
         down_color: str = '#1f77b4',
         rest_color: str = 'lightgrey',
-        set_pvalue: bool = True):
+        set_pvalue: bool = True,
+        control_label: str = None,
+        treatment_label: str = None,
+    ):
     """
-    Plot a volcano plot.
+    Generate a volcano plot.
 
     Parameters
     ----------
-    df
-        The dataframe containing the results.
-    pvalue_key
-        The key of the pvalue column.
-    log2fc_key
-        The key of the log2 fold change column.
-    pvalue_threshold
-        The pvalue threshold.
-    log2fc_threshold
-        The log2 fold change threshold.
-    n_top
-        The number of top genes to label.
-    gene_list
-        A list of genes to label. If None, the top genes will be labeled.
-    ax
-        The axes object to plot on.
-    figsize
-        The figure size.
-    up_color
-        The color of the upregulated genes.
-    down_color
-        The color of the downregulated genes.
-    rest_color
-        The color of the rest genes.
-    
-    Returns
-    -------
-    ax
-        The axes object.
+    df : pd.DataFrame
+        DataFrame containing the results.
+    pvalue_key : str
+        Column name for p-values.
+    log2fc_key : str
+        Column name for log2 fold changes.
+    pvalue_threshold : float
+        Threshold for p-values.
+    log2fc_threshold : float
+        Threshold for log2 fold changes.
+    n_top : int
+        Number of top genes to label.
+    gene_list : list, optional
+        List of specific genes to label. If None, top genes are labeled.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to plot on.
+    figsize : tuple, optional
+        Size of the figure.
+    fontsize : int, optional
+        Font size for gene labels.
+    fontweight : str, optional
+        Font weight for gene labels.
+    up_color : str, optional
+        Color for upregulated genes.
+    down_color : str, optional
+        Color for downregulated genes.
+    rest_color : str, optional
+        Color for the rest of the genes.
+    set_pvalue : bool, optional
+        Whether to set p-values of 0 to the minimum non-zero p-value.
+    control_label : str, optional
+        Label for the control group.
+    treatment_label : str, optional
+        Label for the treatment group.
 
     Examples
     --------
     >>> sctk.pl.plot_volcano(df, log2fc_key='log2FoldChange', pvalue_key='padj', n_top=10)
-    >>> sctk.pl.plot_volcano(de, log2fc_key='log2FoldChange', pvalue_key='padj', gene_list=['ISG15', 'IFIT3', 'LY6E'])
+    >>> sctk.pl.plot_volcano(df, log2fc_key='log2FoldChange', pvalue_key='padj', gene_list=['ISG15', 'IFIT3', 'LY6E'])
     """
     
     assert pvalue_key in df.columns, f'pvalue_key {pvalue_key} not in df.columns'
@@ -156,15 +166,15 @@ def plot_volcano(
 
     sns.scatterplot(
         data = df_rest, x = log2fc_key, y = 'nlog10',
-        s=15, linewidth=0, ax=ax, color=rest_color)
+        s=dotsize, linewidth=0, ax=ax, color=rest_color)
 
     sns.scatterplot(
         data = df_up, x = log2fc_key, y = 'nlog10',
-        s=15, linewidth=0, ax=ax, color=up_color)
+        s=dotsize, linewidth=0, ax=ax, color=up_color)
 
     sns.scatterplot(
         data = df_down, x = log2fc_key, y = 'nlog10',
-        s=15, linewidth=0, ax=ax, color=down_color)
+        s=dotsize, linewidth=0, ax=ax, color=down_color)
 
 
     if gene_list is None:
@@ -184,7 +194,7 @@ def plot_volcano(
                 ax.text(
                     x = item.log2FoldChange, y = item.nlog10, s = item.Index,
                     ha='center', va='center',
-                    fontsize=fontsize, weight = 'bold'))
+                    fontsize=fontsize, weight = fontweight))
             
         adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'), ax=ax)
 
@@ -193,8 +203,25 @@ def plot_volcano(
     ax.axvline(log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
     ax.axvline(-log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
 
-    plt.xlabel("$\mathrm{log_{2}}$(fold change)")
-    plt.ylabel("-$\mathrm{log_{10}}$(p-value)")
+    if control_label is not None and treatment_label is not None:
+        ylim = plt.ylim()
+        xlim = plt.xlim()
+        arrow_control_x = min(-xlim[0], xlim[1]) / 2
+
+        plt.annotate(control_label, 
+             xy=(-log2fc_threshold, ylim[1]), 
+             xytext=(-arrow_control_x, ylim[1]),
+             arrowprops=dict(edgecolor='k', arrowstyle='<-'),
+             horizontalalignment='right', verticalalignment='center')
+
+        plt.annotate(treatment_label, 
+                    xy=(log2fc_threshold, ylim[1]), 
+                    xytext=(arrow_control_x, ylim[1]),
+                    arrowprops=dict(edgecolor='k', arrowstyle='<-'),
+                    horizontalalignment='left', verticalalignment='center')
+
+    plt.xlabel("$\mathrm{Log_{2}}$(fold change)")
+    plt.ylabel("-$\mathrm{Log_{10}}$(p-value)")
     sns.despine()
 
     return ax
