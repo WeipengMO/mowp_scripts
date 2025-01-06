@@ -1,0 +1,10 @@
+transcriptome: /data/user/alldata/db/refdata-gex-GRCh38-2020-A
+probe_set: /data/user/mowp/db/spaceranger/Visium_Human_Transcriptome_Probe_Set_v2.0_GRCh38-2020-A.csv
+
+sample_info:
+  J23002058_1:
+    slide: H1-36VVP4H
+    area: A1
+  J23002058_2:
+    slide: H1-36VVP4H
+    area: D1
