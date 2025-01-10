@@ -6,10 +6,7 @@ pwd = os.getcwd()
 configfile: "config.yaml"
 
 
-samples = [
-    d for d in os.listdir() if os.path.isdir(os.path.join(d)) 
-    and not d.startswith('.') 
-    and not d.endswith('logs')]
+samples = list(config['sample_info'].keys())
 
 rule all:
     input:
@@ -52,5 +49,6 @@ spaceranger count \
     --reorient-images=true \
     --localcores={threads} \
     --localmem=128 \
+    --custom-bin-size=24 \
     --create-bam=false &> ../{log}
         '''
