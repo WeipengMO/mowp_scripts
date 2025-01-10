@@ -6,7 +6,7 @@ from loguru import logger
 import numpy as np
 from ._color import ColorPalette
 from ..pp import adata_process
-from ..utils import configure_logger
+from ..settings import configure_logger
 
 
 def percent_in_cluster(

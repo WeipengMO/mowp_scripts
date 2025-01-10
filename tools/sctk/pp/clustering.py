@@ -1,9 +1,7 @@
 from tqdm.auto import tqdm
 import scanpy as sc
 import numpy as np
-import rpy2.robjects as ro
-from rpy2.robjects.packages import importr
-from ..utils import rtools, configure_logger
+from ..settings import configure_logger
 from loguru import logger
 import seaborn as sns
 from matplotlib import pyplot as plt 
@@ -42,33 +40,6 @@ def leiden_iter(
     
     for ad, res in zip(results, resolutions):
         adata.obs = adata.obs.merge(ad.obs[[f'leiden_{res}']], left_index=True, right_index=True)
-
-
-
-def clustree(
-        adata: sc.AnnData,
-        prefix: str = 'leiden',
-        figsize: tuple = (600, 600),
-        dpi=75,
-        ):
-    """Plot clustree of Leiden clusters.
-
-    Parameters
-    ----------
-    adata
-        Annotated data matrix.
-    prefix
-        Prefix of clusters. eg. 'leiden', 'louvain'.
-    figsize
-        Figure size.
-    """
-    
-    clustree_r = importr("clustree")
-    pattern = f"{prefix}_\d+\.\d+"
-    leien_cluster_r = rtools.py2r(adata.obs.filter(regex=pattern))
-
-    with rtools.r_inline_plot(*figsize, dpi=dpi):
-        print(clustree_r.clustree(leien_cluster_r, prefix=f'{prefix}_'))
 
 
 def get_shilouette_score(

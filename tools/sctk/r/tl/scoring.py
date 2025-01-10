@@ -2,8 +2,8 @@ from math import ceil
 import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 import scipy.sparse as ss
-from ..utils import rtools
-from ..utils.rtools import r2py, py2r, r_inline_plot, rcontext
+from ...utils import rtools
+from ...utils.rtools import r2py, py2r, r_inline_plot, rcontext
 import pandas as pd
 import scanpy as sc
 from typing import Union
