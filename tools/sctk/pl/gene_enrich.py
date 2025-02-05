@@ -87,6 +87,7 @@ def plot_volcano(
         log2fc_threshold: float = 1,
         n_top: int = 10,
         gene_list: list = None,
+        gene_list_sort_key: str = None,
         ax = None,
         figsize = (4, 4),
         fontsize = 8,
@@ -177,16 +178,17 @@ def plot_volcano(
         s=dotsize, linewidth=0, ax=ax, color=down_color)
 
 
-    if gene_list is None:
+    if gene_list is None and gene_list_sort_key is not None:
         _df = df[(df[pvalue_key] < pvalue_threshold) & (abs(df[log2fc_key]) > log2fc_threshold)]
-        if 'stat' in _df.columns:
-            _df_sorted = _df.sort_values('stat')
+        _df_sorted = _df.sort_values(gene_list_sort_key)
+        if gene_list_sort_key != pvalue_key:
             gene_list = list(_df_sorted.index[:n_top//2]) + list(_df_sorted.index[-n_top//2:])
         else:
-            _df_sorted = _df.sort_values(pvalue_key)
             gene_list = list(_df_sorted[_df_sorted[log2fc_key] > 0].index[:n_top//2]) + list(_df_sorted[_df_sorted[log2fc_key] < 0].index[:n_top//2])
+    else:
+        logger.info('gene_list_sort_key is None, no gene_list is provided')
         
-    if len(gene_list) > 0:
+    if isinstance(gene_list, list) and len(gene_list) > 0:
         texts = []
         df['log2FoldChange'] = df[log2fc_key]
         for item in df[df.index.isin(gene_list)].itertuples():
