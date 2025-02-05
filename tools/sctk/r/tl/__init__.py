@@ -3,6 +3,8 @@ from ._nichenetr import (
     _load_prior_knowledge,
     predict_ligand_activities)
 
+from ._cellchat import adata_to_cellchat
+
 from .clusterProfiler import go_analysis
 from .inferCNV import run_inferCNV_r
 
