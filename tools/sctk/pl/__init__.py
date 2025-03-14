@@ -9,6 +9,7 @@ from .enhanced_scanpy import (
     adjust_groupby_ax, 
     set_adata_color,
     boxplot,
+    barplot,
     violinplot)
 from ._color import ColorMaps, ColorPalette
 from ._dotplot import DotPlot
