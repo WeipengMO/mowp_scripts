@@ -26,7 +26,7 @@ def _run_ora(
 
 
 def run_ora(
-        df: Union[pd.DataFrame, List[str]],
+        df: Union[pd.DataFrame, List[str], dict],
         gene_sets: pd.DataFrame,
         source: str = 'geneset',
         target: str = 'genesymbol',
@@ -43,6 +43,13 @@ def run_ora(
         enr_pvals = _run_ora(df, gene_sets, source, target, threshold=threshold)
         enr_pvals['Name'] = 'Gene list'
         results.append(enr_pvals)
+    elif isinstance(df, dict):
+        for name, gene_list in df.items():
+            enr_pvals = _run_ora(gene_list, gene_sets, source, target, threshold=threshold) 
+            enr_pvals['Name'] = name
+            results.append(enr_pvals)
+    else:
+        raise ValueError('Input data type not supported.')
 
     results = pd.concat(results)
     results['-log(FDR p-value)'] = -np.log10(results['FDR p-value'])
