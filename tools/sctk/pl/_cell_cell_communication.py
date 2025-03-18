@@ -435,6 +435,10 @@ def ccc_dotplot(
         plt.figure(figsize=figsize)
         if split is not None:
             split = df_col[split]
+
+        if 'yticklabels_kws' not in kwargs:
+            kwargs['yticklabels_kws'] = {'labelsize': 6}
+            
         dm = DotClustermapPlotter(
             data=data, 
             x=source_target, y=interaction, # hue='target', 
@@ -446,13 +450,14 @@ def ccc_dotplot(
             # set the column annotation
             top_annotation=col_ha,
             col_split=split,
+            col_split_order=list(split.unique()),
             col_split_gap=1,
 
             # Interactions (ligand -> receptor)
             show_rownames=True,
             row_names_side='left',
-            yticklabels_kws={'labelsize': 6},
 
+            x_order=data.sort_values(source_target, ascending=True)[source_target].drop_duplicates().to_list(),
             y_order=data.sort_values(sort_interaction, ascending=sort_interaction_accending)[interaction].drop_duplicates().to_list(),
 
             verbose=0,
