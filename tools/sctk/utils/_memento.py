@@ -70,7 +70,7 @@ def run_memento(
                     continue
 
                 value_counts = adata.obs[condition_key].value_counts()
-                if value_counts[treatment] < min_cells or value_counts[control] < min_cells:
+                if (treatment not in value_counts) or (control not in value_counts) or (value_counts[treatment] < min_cells) or (value_counts[control] < min_cells):
                     logger.warning(f'Skipping {cell_type} due to insufficient cells')
                     continue
                 
