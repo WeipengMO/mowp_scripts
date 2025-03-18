@@ -177,6 +177,8 @@ class Survival(ad.AnnData):
             # results.print_summary()
             print(f'{results.p_value=}')
             print(f'{results.test_statistic=}')
+            self._p_value = results.p_value
+            self._logrank_test = results.test_statistic
 
         return ax
 
