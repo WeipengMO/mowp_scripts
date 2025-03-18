@@ -221,8 +221,6 @@ def boxplot(
     
     plt.tight_layout()
 
-    # plt.show()
-
     return axes
 
 
@@ -238,7 +236,8 @@ def violinplot(
         figsize=(4, 4),
         ncols=3,
         rotation=45,
-        sns_kwargs={}):
+        xticklabels_ha='right',
+        kwargs={}):
     '''
     Boxplot of adata.obs[key] grouped by adata.obs[groupby]
 
@@ -260,7 +259,7 @@ def violinplot(
         A list of colors or a color palette.
     figsize
         The size of the subfigure.
-    sns_kwargs
+    kwargs
         Other keyword arguments for seaborn.boxplot.
     '''
     from collections import OrderedDict
@@ -273,6 +272,7 @@ def violinplot(
     _hue = [] if hue is None else [hue]
     obs_df = sc.get.obs_df(adata, keys=[groupby] + _hue + keys, layer=layer, use_raw=use_raw)
     
+    ncols = min(ncols, len(keys))
     nrows = math.ceil(len(keys)/ncols)
     fig, axes = plt.subplots(
         nrows=math.ceil(len(keys)/ncols), ncols=ncols,
@@ -295,14 +295,15 @@ def violinplot(
             data=obs_df,
             ax=ax,
             palette=palette,
-            **sns_kwargs,
+            **kwargs,
         )
         ax.set_title(key)
         ax.set_ylabel('')
         ax.set_xlabel('')
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha=xticklabels_ha)
         # remove legend
-        ax.get_legend().set_visible(False)
+        if hue is not None:
+            ax.get_legend().set_visible(False)
         sns.despine(ax=ax)
     
     for i in range(len(keys), len(axes)):
@@ -314,8 +315,6 @@ def violinplot(
         fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
     
     plt.tight_layout()
-
-    plt.show()
 
     return axes
 
@@ -332,6 +331,7 @@ def barplot(
         figsize=(4, 4),
         ncols=3,
         rotation=45,
+        xticklabels_ha='right',
         kwargs={},
         ):
     '''
@@ -396,7 +396,7 @@ def barplot(
         ax.set_title(key)
         ax.set_ylabel('')
         ax.set_xlabel('')
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha=xticklabels_ha)
         # remove legend
         if hue is not None:
             ax.get_legend().set_visible(False)
@@ -412,6 +412,101 @@ def barplot(
     
     plt.tight_layout()
 
-    # plt.show()
+    return axes
+
+
+def stripplot(
+        adata: sc.AnnData, 
+        keys: Union[str, list[str]], 
+        groupby: str,
+        hue: str = None,
+        layer=None,
+        use_raw=False,
+        palette=None,
+        figsize=(4, 4),
+        ncols=3,
+        rotation=45,
+        jitter: float = None,
+        kwargs={},
+        ):
+    '''
+    Stripplot of adata.obs[key] grouped by adata.obs[groupby]
+
+    Parameters
+    ----------
+    adata
+        An AnnData object.
+    keys
+        Keys for accessing variables of `.var_names` or fields of `.obs`.
+    groupby
+        The `adata.obs` key of the observation grouping to consider.
+    layer
+        The layer to use.
+    use_raw
+        Use `adata.raw` for plotting.
+    palette
+        A list of colors or a color palette.
+    figsize
+        The size of the subfigure.
+    sns_kwargs
+        Other keyword arguments for seaborn.boxplot.
+    '''
+    from collections import OrderedDict
+
+
+    if isinstance(keys, str):
+        keys = [keys]
+    keys = list(OrderedDict.fromkeys(keys))  # remove duplicates, preserving the order
+
+    _hue = [] if hue is None else [hue]
+    obs_df = sc.get.obs_df(adata, keys=[groupby] + _hue + keys, layer=layer, use_raw=use_raw)
+    
+    ncols = min(ncols, len(keys))
+    nrows = math.ceil(len(keys)/ncols)
+    fig, axes = plt.subplots(
+        nrows=math.ceil(len(keys)/ncols), ncols=ncols,
+        figsize=(figsize[0]*ncols, figsize[1]*nrows),
+    )
+
+    axes = axes.flatten() if len(keys) > 1 else [axes]
+
+    if palette is None:
+        uns_colors = adata.uns.get(groupby + '_colors')
+        if uns_colors is not None:
+            palette = uns_colors
+
+    for i, key in enumerate(keys):
+        ax = axes[i]
+        sns.stripplot(
+            x=groupby,
+            y=key,
+            hue=hue,
+            data=obs_df,
+            ax=ax,
+            dodge=True,
+            jitter=jitter,
+            color='black',
+            size=1,
+            **kwargs,
+        )
+
+        # ax.set_title(key)
+        ax.set_ylabel('')
+        ax.set_xlabel('')
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=rotation, ha='right')
+        # remove legend
+        if hue is not None:
+            ax.get_legend().set_visible(False)
+        sns.despine(ax=ax)
+    
+    for i in range(len(keys), len(axes)):
+        fig.delaxes(axes[i])
+    
+    # Create a legend outside the plot
+    if len(_hue) > 0:
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
+    
+    plt.tight_layout()
 
     return axes

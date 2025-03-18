@@ -10,6 +10,7 @@ from .enhanced_scanpy import (
     set_adata_color,
     boxplot,
     barplot,
+    stripplot,
     violinplot)
 from ._color import ColorMaps, ColorPalette
 from ._dotplot import DotPlot
