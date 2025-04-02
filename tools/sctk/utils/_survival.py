@@ -15,9 +15,9 @@ class Survival(ad.AnnData):
 
     def __init__(
             self, 
-            exp_data: ad.AnnData, 
-            meta_data: pd.DataFrame, 
-            meta_index_col: str,
+            exp_data: Union[ad.AnnData, str], 
+            meta_data: pd.DataFrame = None, 
+            meta_index_col: str = None,
             transpose_exp: bool = True, 
             meta_kwargs: dict = {},
             ):
@@ -27,7 +27,7 @@ class Survival(ad.AnnData):
         Parameters:
         ----------
         exp_data: ad.AnnData
-            A gene expression matrix.
+            An AnnData object containing expression data and metadata or a file path to the expression data.
 
         meta_data: pd.DataFrame
             A DataFrame containing survival data.
@@ -42,17 +42,27 @@ class Survival(ad.AnnData):
             Additional keyword arguments to be passed to pd.read_csv.
         
         '''
-        adata = ad.read_csv(exp_data, delimiter='\t')
-        if transpose_exp:
-            adata = adata.T
-        
-        meta_data = pd.read_csv(meta_data, sep='\t', index_col=meta_index_col, **meta_kwargs)
-        sample_ids_intersect = adata.obs.index.intersection(meta_data.index)
-        if len(sample_ids_intersect) == 0:
-            raise ValueError('No sample IDs are intersected between expression data and metadata.')
+        if isinstance(exp_data, ad.AnnData):
+            adata = exp_data
+        elif isinstance(exp_data, str):
+            if meta_data is None:
+                raise ValueError('meta_data must be provided when exp_data is a file path.')
+            if meta_index_col is None:
+                raise ValueError('meta_index_col must be provided when exp_data is a file path.')
+            
+            adata = ad.read_csv(exp_data, delimiter='\t')
+            if transpose_exp:
+                adata = adata.T
+            
+            meta_data = pd.read_csv(meta_data, sep='\t', index_col=meta_index_col, **meta_kwargs)
+            sample_ids_intersect = adata.obs.index.intersection(meta_data.index)
+            if len(sample_ids_intersect) == 0:
+                raise ValueError('No sample IDs are intersected between expression data and metadata.')
 
-        adata = adata[sample_ids_intersect].copy()
-        adata.obs = meta_data.loc[sample_ids_intersect]
+            adata = adata[sample_ids_intersect].copy()
+            adata.obs = meta_data.loc[sample_ids_intersect]
+        else:
+            raise ValueError('exp_data must be an AnnData object or a file path.')
 
         self._init_as_actual(
                 X=adata.X,
@@ -120,6 +130,11 @@ class Survival(ad.AnnData):
         elif group_method == 'quantile':
             survival_data['group'] = pd.qcut(survival_data[groupby], 4, labels=['Low', 'q50', 'q75', 'High'])
             self.group_label = ['Low', 'High']
+        elif group_method == 'best':
+            best_cutoff, best_p = self._find_best_cutoff(survival_data, groupby, event, time)
+            survival_data['group'] = np.where(survival_data[groupby] <= best_cutoff, 'Low', 'High')
+            self.group_label = ['Low', 'High']
+            logger.info(f'Best cutoff: {best_cutoff}, Best p-value: {best_p}')
         elif isinstance(group_method, int):
             self.group_label = [f'G{i}' for i in range(group_method)]
             survival_data['group'] = pd.qcut(survival_data[groupby], group_method, labels=self.group_label)
@@ -132,6 +147,43 @@ class Survival(ad.AnnData):
         self.group_method = group_method
     
 
+    def _find_best_cutoff(self, survival_data, groupby, event, time, min_samples_per_group=10):
+        '''
+        Find the best cutoff for grouping samples based on a gene signature.'
+        '''
+        sorted_values = np.sort(survival_data[groupby].unique())
+        candidate_cutoffs = sorted_values
+        best_stat = -np.inf
+        best_cut = None
+        best_p = 1.0
+
+        for cutoff in candidate_cutoffs:
+            low_group = survival_data[groupby] <= cutoff
+            high_group = survival_data[groupby] > cutoff
+
+            # 检查分组有效性
+            if (low_group.sum() < min_samples_per_group) or (high_group.sum() < min_samples_per_group):
+                continue
+            events_low = survival_data.loc[low_group, event].sum()
+            events_high = survival_data.loc[high_group, event].sum()
+            if events_low == 0 or events_high == 0:
+                continue
+
+            # 执行对数秩检验
+            result = logrank_test(
+                survival_data.loc[low_group, time],
+                survival_data.loc[high_group, time],
+                event_observed_A=survival_data.loc[low_group, event],
+                event_observed_B=survival_data.loc[high_group, event]
+            )
+            if result.test_statistic > best_stat:
+                best_stat = result.test_statistic
+                best_cut = cutoff
+                best_p = result.p_value
+
+        return best_cut, best_p
+
+
     def km_plot(
             self, 
             ci_show: bool = False,
@@ -140,6 +192,7 @@ class Survival(ad.AnnData):
             xlabel: str = 'Time',
             ylabel: str = 'Survival probability',
             pattle = None,
+            show_numbers: bool = False,
             ax = None
             ):
         if pattle is None:
@@ -157,7 +210,11 @@ class Survival(ad.AnnData):
         by_group = {}
         for (group, _df), color in zip(survival_data.groupby('group'), pattle):
             by_group[group] = _df
-            kmf.fit(_df[self.time], _df[self.event], label=group)
+            if show_numbers:
+                label = f'{group} ({_df.shape[0]})'
+            else:
+                label = group
+            kmf.fit(_df[self.time], _df[self.event], label=label)
             kmf.plot_survival_function(
                 ci_show=ci_show, show_censors=show_censors, color=color, ax=ax)
 
