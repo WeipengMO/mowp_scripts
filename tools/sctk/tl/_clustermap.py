@@ -226,7 +226,8 @@ class ClusterMap:
         yticklabels=False,
         x_rotation: float = None,
         y_rotation: float = None,
-        figsize: tuple = (5, 5)
+        figsize: tuple = (5, 5),
+        **kwargs
     ):
         '''
         Plot the cluster map.
@@ -288,7 +289,8 @@ class ClusterMap:
             figsize=figsize, 
             vmax=vmax, 
             vmin=vmin,
-            center=center)
+            center=center,
+            **kwargs)
         
         if not show_row_dendrogram:
             g.ax_row_dendrogram.set_visible(False)
