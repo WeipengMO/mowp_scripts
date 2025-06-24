@@ -237,7 +237,7 @@ def violinplot(
         ncols=3,
         rotation=45,
         xticklabels_ha='right',
-        kwargs={}):
+        **kwargs):
     '''
     Boxplot of adata.obs[key] grouped by adata.obs[groupby]
 
@@ -260,10 +260,10 @@ def violinplot(
     figsize
         The size of the subfigure.
     kwargs
-        Other keyword arguments for seaborn.boxplot.
+        Other keyword arguments for seaborn.violinplot.
     '''
     from collections import OrderedDict
-
+    
 
     if isinstance(keys, str):
         keys = [keys]
@@ -324,7 +324,6 @@ def barplot(
         keys: Union[str, list[str]], 
         groupby: str,
         hue: str = None,
-        showfliers=False,
         layer=None,
         use_raw=False,
         palette=None,
@@ -332,7 +331,7 @@ def barplot(
         ncols=3,
         rotation=45,
         xticklabels_ha='right',
-        kwargs={},
+        **kwargs
         ):
     '''
     Barplot of adata.obs[key] grouped by adata.obs[groupby]
@@ -353,8 +352,14 @@ def barplot(
         A list of colors or a color palette.
     figsize
         The size of the subfigure.
-    sns_kwargs
-        Other keyword arguments for seaborn.boxplot.
+    ncols
+        The number of columns in the subfigure.
+    rotation
+        The rotation of the x-axis tick labels.
+    xticklabels_ha
+        The horizontal alignment of the x-axis tick labels.
+    kwargs
+        Other keyword arguments for seaborn.barplot.
     '''
     from collections import OrderedDict
 
