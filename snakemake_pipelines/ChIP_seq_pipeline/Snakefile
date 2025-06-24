@@ -1,5 +1,6 @@
 import os
 from glob import glob
+import pandas as pd
 
 configfile: 
     "config.yml"
@@ -7,7 +8,6 @@ configfile:
 workdir:
     config['workdir']
 
-mode = config['mode']
 mode = config['mode']
 suffix = config['suffix']
 sep = config['sep']
@@ -17,13 +17,28 @@ if mode == 'pe':
 else:
     chipseq_smk = 'chipseq_se.smk'
 
+# Check if the sample table has control columns
+sample_table = config['sample_table']
+try:
+    sample_tabel_df = pd.read_csv(sample_table, sep='\t', header=None)
+    if sample_tabel_df.isna().any().sum() == 0:
+        callpeak_smk = 'callpeak_with_control.smk'
+    else:
+        callpeak_smk = 'callpeak_without_control.smk'
+except:
+    callpeak_smk = 'callpeak_without_control.smk'
+
 include:
     "snakemake/"+chipseq_smk
 
 include:
-    "snakemake/callpeak.smk"
+    "snakemake/"+callpeak_smk
 
-sample_name = [os.path.basename(fn.split(sep)[0]) for fn in glob(f'raw_data/*{sep}{suffix}')]
+sample_name = [os.path.basename(fn.split(sep)[0]) for fn in sorted(glob(f'raw_data/*{sep}{suffix}'))]
+print('Sample names: ', end='')
+for _sample_name in sample_name:
+    print(_sample_name, end=',')
+print()
 
 rule all:
     input:
