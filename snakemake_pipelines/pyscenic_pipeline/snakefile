@@ -28,10 +28,10 @@ rule grn:
     params:
         tfs_path = config['tfs_path'],
         sif = config['container']
-    threads: 16
+    threads: 32
     log: 'logs/grn.{sample}.log'
     shell: '''
-        singularity run -B /data:/data {params.sif} pyscenic grn {input} {params.tfs_path} -o {output} --num_workers {threads} &> {log}
+        singularity run -B /data:/data {params.sif} arboreto_with_multiprocessing.py {input} {params.tfs_path} -o {output} --num_workers {threads} --seed 42 &> {log}
     '''
 
 
