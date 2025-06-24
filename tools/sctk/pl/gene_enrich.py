@@ -192,12 +192,13 @@ def plot_volcano(
         texts = []
         df['log2FoldChange'] = df[log2fc_key]
         for item in df[df.index.isin(gene_list)].itertuples():
+            ha = 'left' if item.log2FoldChange > 0 else 'right'
             texts.append(
                 ax.text(
                     x = item.log2FoldChange, y = item.nlog10, s = item.Index,
-                    ha='center', va='center',
-                    fontsize=fontsize, weight = fontweight))
-            
+                    ha=ha, va='center',
+                    fontsize=fontsize, weight = fontweight)
+            )
         adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'), ax=ax)
 
 
@@ -222,8 +223,8 @@ def plot_volcano(
                     arrowprops=dict(edgecolor='k', arrowstyle='<-'),
                     horizontalalignment='left', verticalalignment='center')
 
-    plt.xlabel("$\mathrm{Log_{2}}$(fold change)")
-    plt.ylabel("-$\mathrm{Log_{10}}$(p-value)")
+    plt.xlabel("$\mathrm{log_{2}}$(fold change)")
+    plt.ylabel("-$\mathrm{log_{10}}$(p-value)")
     sns.despine()
 
     return ax
