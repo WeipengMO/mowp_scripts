@@ -1,7 +1,11 @@
 import requests
 from loguru import logger
 import json
+import numpy as np
 import pandas as pd
+from . import rtools
+import rpy2.robjects as ro
+from rpy2.robjects.packages import importr
 
 
 def convert_gene_symbol(genes: str, species='human'):
@@ -117,3 +121,22 @@ def gmt_to_dc(pth: str) -> pd.DataFrame:
         chain.from_iterable(zip(repeat(k), v) for k, v in pathways.items()),
         columns=["geneset", "genesymbol"],
     )
+
+
+def convert_gene(gene_list: list, convert:str='mouse_to_human'):
+    import rpy2.robjects as ro
+    from rpy2.robjects.packages import importr
+    R = ro.r
+
+    importr('nichenetr')
+    gene_list = rtools.py2r(np.array(gene_list))
+    if convert == 'mouse_to_human':
+        res = R['convert_mouse_to_human_symbols'](gene_list)
+    elif convert == 'human_to_mouse':
+        res = R['convert_human_to_mouse_symbols'](gene_list)
+    else:
+        raise ValueError("convert must be either 'mouse_to_human' or 'human_to_mouse'")
+    
+    res = rtools.r2py(res)
+
+    return res

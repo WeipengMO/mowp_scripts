@@ -3,8 +3,10 @@ from loguru import logger
 from . import rtools
 from ._genes import (
     convert_gene_symbol,
-    ensemble_to_symbol
+    ensemble_to_symbol,
+    convert_gene,
 )
+from ._tools import confirm_overwrite
 
 try:
     from ._survival import Survival

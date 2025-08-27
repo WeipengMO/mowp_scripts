@@ -193,7 +193,7 @@ class Survival(ad.AnnData):
             ylabel: str = 'Survival probability',
             pattle = None,
             show_numbers: bool = False,
-            ax = None
+            ax = None,
             ):
         if pattle is None:
             pattle = sns.color_palette(['#e41a1c', '#377eb8', '#984ea3', '#ff7f00'])
@@ -211,7 +211,7 @@ class Survival(ad.AnnData):
         for (group, _df), color in zip(survival_data.groupby('group'), pattle):
             by_group[group] = _df
             if show_numbers:
-                label = f'{group} ({_df.shape[0]})'
+                label = f'{group} (n={_df.shape[0]})'
             else:
                 label = group
             kmf.fit(_df[self.time], _df[self.event], label=label)
