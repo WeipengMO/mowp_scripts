@@ -77,7 +77,9 @@ class Survival(ad.AnnData):
             group_method: Union[str, int] = 'median',
             event: str = 'OS', 
             time: str = 'OS.time',
-            time_limit: float = None):
+            time_limit: float = None,
+            verbose: bool = True
+        ):
         '''
         Group samples based on a given gene signature or a list of genes.
 
@@ -109,7 +111,7 @@ class Survival(ad.AnnData):
             if len(common_genes) == 0:
                 raise ValueError('No common genes are found between the gene signature and the expression data.')
             genes_to_ignore = set(groupby) - set(common_genes)
-            if len(genes_to_ignore) > 0:
+            if len(genes_to_ignore) > 0 and verbose:
                 logger.info(f'Genes to ignore: {genes_to_ignore}')
 
             # use average expression of a gene signature as a score
@@ -134,7 +136,8 @@ class Survival(ad.AnnData):
             best_cutoff, best_p = self._find_best_cutoff(survival_data, groupby, event, time)
             survival_data['group'] = np.where(survival_data[groupby] <= best_cutoff, 'Low', 'High')
             self.group_label = ['Low', 'High']
-            logger.info(f'Best cutoff: {best_cutoff}, Best p-value: {best_p}')
+            if verbose:
+                logger.info(f'Best cutoff: {best_cutoff}, Best p-value: {best_p}')
         elif isinstance(group_method, int):
             self.group_label = [f'G{i}' for i in range(group_method)]
             survival_data['group'] = pd.qcut(survival_data[groupby], group_method, labels=self.group_label)

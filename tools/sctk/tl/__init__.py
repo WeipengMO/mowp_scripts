@@ -5,4 +5,6 @@ from .meta_program import MetaProgram
 from ._clustermap import ClusterMap
 from ._utils import (
     grouped_obs_mean,
-    var_means)
+    var_means,
+    split_cells_by_gene
+)
