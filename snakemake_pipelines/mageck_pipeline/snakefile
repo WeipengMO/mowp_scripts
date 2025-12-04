@@ -1,0 +1,143 @@
+import pandas as pd
+import os
+
+# Path to the sgRNA library file used by MAGeCK
+LIBRARY = "human_geckov2_library_a_09mar2015.csv"
+NEG_CONTROL = "neg_control_sgrna.txt"
+
+SAMPLE_TSV = "samples.tsv"
+
+
+def _load_samples():
+    """Load the sample sheet once and cache it."""
+    df = pd.read_csv(SAMPLE_TSV, sep="\t")
+    for item in df.itertuples():
+        if not os.path.exists(item.fq1):
+            raise FileNotFoundError(f"FASTQ file {item.fq1} not found")
+        if not os.path.exists(item.fq2):
+            raise FileNotFoundError(f"FASTQ file {item.fq2} not found")
+    return df
+
+
+SAMPLES = _load_samples()
+CELL_LINES = SAMPLES["cell_line"].unique().tolist()
+
+
+def _sample_arg(cell_line: str) -> str:
+    """Build the sample label for MAGeCK."""
+    samples_df = SAMPLES.query("cell_line == @cell_line")
+    label_list = []
+    for item in samples_df.itertuples():
+        _label = f"{item.cell_line}_{item.group}_{item.replicatie}"
+        label_list.append(_label)
+        
+    return ",".join(label_list)
+
+
+
+def _fastq_arg(cell_line: str, col: str) -> str:
+    """Build the space‑separated argument for --fastq / --fastq-2."""
+    samples_df = SAMPLES.query("cell_line == @cell_line")
+    fastq_list = []
+    for item in samples_df.itertuples():
+        fq = getattr(item, col)
+        fastq_list.append(fq)
+    
+    return " ".join(fastq_list)
+
+
+def _condition_arg(cell_line: str, group_id: str) -> str:
+    """Build the treatment argument for MAGeCK test."""
+    samples_df = SAMPLES.query("cell_line == @cell_line")
+    condition_list = []
+    for item in samples_df.itertuples():
+        if item.group == group_id:
+            _label = f"{item.cell_line}_{item.group}_{item.replicatie}"
+            condition_list.append(_label)
+
+    return ",".join(condition_list)
+
+
+rule all:
+    """Final targets: gene‑level test summaries for every cell line."""
+    input:
+        expand("results/{cell_line}/{cell_line}.gene_summary.txt", cell_line=CELL_LINES)
+
+
+rule swap_fastq:
+    """Swap FASTQ files to match the expected naming convention."""
+    input:
+        fastq1=lambda wc: _fastq_arg(wc.cell_line, "fq1"),
+        fastq2=lambda wc: _fastq_arg(wc.cell_line, "fq2")
+    params:
+        cell_line=lambda wc: wc.cell_line
+    log:
+        "logs/swap_fastq/{cell_line}.log"
+    conda:
+        "rnaseq"
+    shell:
+        """
+        mkdir -p results/{wildcards.cell_line}
+        swap_fastq.py {params.cell_line} 2> {log}
+        """
+
+
+rule mageck_count:
+    """Count reads per sgRNA for each cell line (combining replicates)."""
+    output:
+        count_table="results/{cell_line}/{cell_line}.count.txt"
+    params:
+        sample_label=lambda wc: _sample_arg(wc.cell_line),
+        fastq1=lambda wc: _fastq_arg(wc.cell_line, "fq1"),
+        fastq2=lambda wc: _fastq_arg(wc.cell_line, "fq2"),
+        library=LIBRARY,
+        neg_control=NEG_CONTROL
+    log:
+        "logs/mageck_count/{cell_line}.log"
+    conda:
+        "mageckenv"
+    shell:
+        r"""
+        mkdir -p results/{wildcards.cell_line}
+        mageck count \
+          -l {params.library} \
+          -n {wildcards.cell_line} \
+          --sample-label "{params.sample_label}" \
+          --fastq {params.fastq1} \
+          --norm-method control \
+          --control-sgrna {params.neg_control} \
+          --sgrna-len 20 \
+          --unmapped-to-file \
+          2> {log}
+
+        mv {wildcards.cell_line}*.* results/{wildcards.cell_line}
+        """
+
+
+rule mageck_test:
+    """Perform MAGeCK test (NK vs WT) on each count table."""
+    input:
+        count_table="results/{cell_line}/{cell_line}.count.txt"
+    output:
+        "results/{cell_line}/{cell_line}.gene_summary.txt"
+    params:
+        treatment=lambda wc: _condition_arg(wc.cell_line, "NK"),
+        control=lambda wc: _condition_arg(wc.cell_line, "WT"),
+        neg_control=NEG_CONTROL
+    log:
+        "logs/mageck_test/{cell_line}.log"
+    conda:
+        "mageckenv"
+    shell:
+        r"""
+        mageck test \
+          -k {input.count_table} \
+          -t {params.treatment} \
+          -c {params.control} \
+          --norm-method control \
+          --control-sgrna {params.neg_control} \
+          -n {wildcards.cell_line} \
+          2> {log}
+
+        mv {wildcards.cell_line}*.* results/{wildcards.cell_line}
+        """
