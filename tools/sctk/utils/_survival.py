@@ -246,4 +246,79 @@ class Survival(ad.AnnData):
         adata = ad.AnnData(X=self.X, obs=self.obs, var=self.var)
         
         return adata
+    
+
+    def coxph_group_hr(
+        self,
+        add_covariates: List[str] = None,
+        ref_group: str = 'Low',
+        verbose: bool = False,
+    ):
+        """
+        Compute hazard ratio (HR) between groups using Cox regression (High vs Low by default).
+
+        Parameters
+        ----------
+        add_covariates : list of str
+            Additional covariates (column names in self.obs) for multivariable adjustment,
+            e.g., ['age', 'gender', 'stage'].
+        ref_group : str
+            Name of the reference group (default: 'Low').
+        """
+        survival_data = self.uns['survival'].copy()
+
+        # 只保留需要的组（通常是 ['Low', 'High']）
+        survival_data = survival_data[survival_data['group'].isin(self.group_label)].copy()
+
+        # 把组转成二分类 0/1，参考组为 0，对照组为 1
+        # 例如：Low = 0, High = 1，这样 exp(coef) 就是 "High vs Low" 的 HR
+        other_group = [g for g in self.group_label if g != ref_group]
+        if len(other_group) != 1:
+            raise ValueError(f"group_label 应该只有两组，如 ['Low', 'High']，当前: {self.group_label}")
+        other_group = other_group[0]
+
+        survival_data['group_bin'] = survival_data['group'].map(
+            {ref_group: 0, other_group: 1}
+        )
+
+        cols = [self.time, self.event, 'group_bin']
+
+        # 如果有额外协变量就加上
+        if add_covariates is not None:
+            for cov in add_covariates:
+                if cov not in survival_data.columns:
+                    raise ValueError(f'协变量 {cov} 不在 survival_data 中')
+            cols += add_covariates
+
+        df_cox = survival_data[cols].dropna()
+
+        cph = CoxPHFitter()
+        cph.fit(df_cox, duration_col=self.time, event_col=self.event)
+
+        if verbose:
+            try:
+                from IPython.display import display
+            except ImportError:
+                print(cph.summary)
+            else:
+                display(cph.summary)
+
+        # 取出 HR 和 CI，p 值
+        hr = cph.summary.loc['group_bin', 'exp(coef)']
+        ci_lower, ci_upper = cph.summary[['exp(coef) lower 95%', 'exp(coef) upper 95%']].loc['group_bin']
+        p_val = cph.summary.loc['group_bin', 'p']
+
+        # 存在对象里，方便后面用
+        self._coxph_result = {
+            'hr': hr,
+            'ci_lower': ci_lower,
+            'ci_upper': ci_upper,
+            'p_value': p_val,
+            # 'model': cph,
+            # 'formula': ['group_bin'] + (add_covariates or []),
+            'ref_group': ref_group,
+            'other_group': other_group,
+        }
+
+        return self._coxph_result
                 
