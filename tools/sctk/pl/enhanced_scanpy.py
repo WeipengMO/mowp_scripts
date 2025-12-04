@@ -237,6 +237,8 @@ def violinplot(
         ncols=3,
         rotation=45,
         xticklabels_ha='right',
+        legend_loc='upper left',
+        show_legend=True,
         **kwargs):
     '''
     Boxplot of adata.obs[key] grouped by adata.obs[groupby]
@@ -310,9 +312,14 @@ def violinplot(
         fig.delaxes(axes[i])
     
     # Create a legend outside the plot
-    if len(_hue) > 0:
+    if len(_hue) > 0 and show_legend:
         handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
+        if legend_loc == 'upper left':
+            fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.01, 1), ncol=1, frameon=False)
+        elif legend_loc == 'lower center':
+            fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=2, frameon=False)
+        else:
+            raise ValueError(f'Unsupported legend location: {legend_loc}')
     
     plt.tight_layout()
 

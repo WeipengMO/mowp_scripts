@@ -201,14 +201,10 @@ def plot_volcano(
             )
         adjust_text(texts, arrowprops = dict(arrowstyle = '-', color = 'k'), ax=ax)
 
-
-    ax.axhline(log_pvalue_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
-    ax.axvline(log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
-    ax.axvline(-log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
-
+    ylim = list(plt.ylim())
+    xlim = list(plt.xlim())
     if control_label is not None and treatment_label is not None:
-        ylim = plt.ylim()
-        xlim = plt.xlim()
+        ylim[1] = (ylim[1]-ylim[0])*1.05+ylim[0]
         arrow_control_x = min(-xlim[0], xlim[1]) / 2
 
         plt.annotate(control_label, 
@@ -222,9 +218,14 @@ def plot_volcano(
                     xytext=(arrow_control_x, ylim[1]),
                     arrowprops=dict(edgecolor='k', arrowstyle='<-'),
                     horizontalalignment='left', verticalalignment='center')
-
+    
+    plt.ylim(ylim)
+    ax.axhline(log_pvalue_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
+    ax.axvline(log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
+    ax.axvline(-log2fc_threshold, zorder = 1, c = 'k', lw = 1, ls = '--')
+    
     plt.xlabel("$\mathrm{log_{2}}$(fold change)")
-    plt.ylabel("-$\mathrm{log_{10}}$(p-value)")
+    plt.ylabel("-$\mathrm{log_{10}}$(p value)")
     sns.despine()
 
     return ax
@@ -239,7 +240,9 @@ def plot_gsea_bar(
         fontsize=8,
         figsize = None,
         title: str = '',
-        bar_color: str = 'lightblue'):
+        bar_color: str = 'lightblue',
+        term_key: str = 'Term',
+    ):
     
     enr = enr[enr[pvalue_key] < pvalue_threshold].copy()
     if both_directions:
@@ -257,7 +260,7 @@ def plot_gsea_bar(
         figsize = (figsize, 0.6 * len(top_results))
 
     plt.figure(figsize=figsize)
-    plt.barh(top_results['Term'], top_results['NES'], color=bar_color)
+    plt.barh(top_results[term_key], top_results['NES'], color=bar_color)
     plt.xlabel('Normalized Enrichment Score (NES)', fontsize=12)
     plt.title(title)
     ylim = plt.ylim()

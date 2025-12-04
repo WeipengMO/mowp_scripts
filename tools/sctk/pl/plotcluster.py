@@ -4,6 +4,7 @@ import seaborn as sns
 from typing import List, Dict, Optional
 from loguru import logger
 import numpy as np
+import pandas as pd
 from ._color import ColorPalette
 from ..pp import adata_process
 from ..settings import configure_logger
@@ -64,9 +65,7 @@ def percent_in_cluster(
     if not labelColor:
         labelColor = adata_process.get_adata_color(adata, label)
 
-    groupbyWithLabelCountsDf = (
-        adata.obs.groupby(groupby)[label].apply(lambda x: x.value_counts()).unstack()
-    )
+    groupbyWithLabelCountsDf = pd.crosstab(adata.obs[groupby], adata.obs[label])
 
     if sort_index:
         index = sorted(groupbyWithLabelCountsDf.index)
@@ -97,7 +96,7 @@ def percent_in_cluster(
                 )
             )
             legendLabelLs.append(singleLabel)
-        legendHandleLs, legendLabelLs = legendHandleLs[::-1], legendLabelLs[::-1]
+        # legendHandleLs, legendLabelLs = legendHandleLs[::-1], legendLabelLs[::-1]
         # plt.legend(legendHandleLs, legendLabelLs, frameon=False, **legend_kwargs)
         if plot_legend:
             plt.legend(handles=legendHandleLs, frameon=False, **legend_kwargs)
@@ -205,7 +204,7 @@ def _reorder_data(df_group: dict, keys_to_order: list = None):
         df_group[key] = df_group[key].reindex(index_order)
 
 
-def _plot_grouped_bars(adata, df_group, subkeys, key, figsize, subtitle=True, debug=True):
+def _plot_grouped_bars(adata, df_group, subkeys, key, figsize, subtitle=True, debug=True, bbox_to_anchor=(1.1, .9)):
     """
     Plot grouped bar charts with legend outside the figure.
 
@@ -291,7 +290,7 @@ def _plot_grouped_bars(adata, df_group, subkeys, key, figsize, subtitle=True, de
         handles.append(plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10))
         labels.append(cell_type)
 
-    fig.legend(handles, labels, loc='upper right', bbox_to_anchor=(1.1, .9), frameon=False)
+    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=bbox_to_anchor, frameon=False)
 
     fig.subplots_adjust(wspace=0.1)
     plt.show()
@@ -307,7 +306,8 @@ def percent_in_cluster_group(
     subtitle: bool = True,
     figsize: tuple = (8, 4),
     remove_suffix: bool = False,
-    debug: bool = True
+    debug: bool = True,
+    bbox_to_anchor=(1.1, .9),
 ):
     """
     Calculate the percentage of cells in each cluster group.
@@ -350,4 +350,4 @@ def percent_in_cluster_group(
 
     # Plot the grouped bar charts
     _plot_grouped_bars(
-        adata, df_group, subkeys, key=key, figsize=figsize, subtitle=subtitle, debug=debug)
+        adata, df_group, subkeys, key=key, figsize=figsize, subtitle=subtitle, debug=debug, bbox_to_anchor=bbox_to_anchor)
