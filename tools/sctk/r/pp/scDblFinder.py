@@ -7,6 +7,7 @@ from loguru import logger
 
 def scDblFinder(
     adata: sc.AnnData,
+    layer: str = 'counts',
     batch_key: str = None,
     dbr: int = None,
     n_jobs: int = 4,
@@ -19,6 +20,8 @@ def scDblFinder(
     ----------
     adata : AnnData
         Annotated data matrix.
+    layer : str, optional
+        count matrix layer to use. If None, uses adata.X.
     batch_key : str, optional
         Key for batch information in adata.obs.
     dbr : int, optional
@@ -51,7 +54,11 @@ def scDblFinder(
         else:
             rEnv['dbr'] = ro.r('NULL')
 
-        rEnv['data_mat'] = rtools.py2r(adata.X.T)
+        if layer in adata.layers:
+            rEnv['data_mat'] = rtools.py2r(adata.layers[layer].T)
+        else:
+            logger.warning(f"Layer '{layer}' not found in adata.layers. Using adata.X instead.")
+            rEnv['data_mat'] = rtools.py2r(adata.X.T)
         rEnv['colData'] = rtools.py2r(adata.obs)
 
 
