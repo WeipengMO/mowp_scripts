@@ -738,6 +738,7 @@ def drop_meta_programs(
 
     return mp_res
 
+
 def plot_meta_programs(
     mp_res,
     similarity_cutoff: Tuple[float, float] = (0.0, 1.0),
@@ -796,6 +797,7 @@ def plot_meta_programs(
     """
     # 取程序相似度矩阵
     S = mp_res.programs_similarity.copy()
+    # 初始排序：根据 linkage 排序
     order = leaves_list(mp_res.linkage)
     S = S.iloc[order, order]
 
@@ -848,7 +850,7 @@ def plot_meta_programs(
 
     # ---------- 3) MP 颜色注释 ----------
     mp_labels = mp_res.programs_clusters.reindex(prog_ids)
-    # 按 MP 后的数字排序（若非 MP<number> 则放在后面按字母序）
+    
     mp_vals = mp_labels.dropna().unique().tolist()
     pattern_mp = re.compile(r"^MP(\d+)$")
 
@@ -868,9 +870,19 @@ def plot_meta_programs(
 
     # ---------- 4) 树状图 / 聚类 ----------
     row_linkage = col_linkage = None
+    row_cluster = col_cluster = False
+
     if showtree and len(prog_ids) > 1:
         if downsample is None:
             # 没有下采样，直接复用 get_meta_programs 算好的 linkage
+            # 注意：S 之前已经根据 linkage 排序过了，所以如果不在此处传 linkage，
+            # 设置 row_cluster=False 可以保持顺序。
+            # 但为了保险，如果要显示树，通常让 clustermap 自己画。
+            # 不过原始代码逻辑是：如果不下采样，row_cluster=False，意味着不再重新聚类，
+            # 而是信任 S 已经是排好序的，并且不显示 dendrogram 线条本身？
+            # 如果想显示树，必须传 linkage 或者让它算。
+            # 原始代码逻辑似乎是: linkage=None, cluster=False -> 不画树。
+            # 这里微调一下逻辑以兼容 boxes 绘制：
             row_linkage = col_linkage = None
             row_cluster = col_cluster = False
         else:
@@ -902,18 +914,63 @@ def plot_meta_programs(
         **heatmap_kws,
     )
 
-
     heatmap = g.ax_heatmap.collections[0]
 
-    # 创建图例的 "handles" (色块)：基于已有的 MP 标签和 annotation_colors 构造
-    # MPs 在上面已由 mp_labels 推导得到
+    # ---------- 7) 在对角线绘制虚线框 ----------
+    # 获取热图最终显示的行顺序
+    # 如果 clustermap 执行了聚类 (row_cluster=True)，则顺序在 dendrogram_row.reordered_ind
+    # 如果没有执行聚类 (row_cluster=False)，则顺序就是 DataFrame 的 index 顺序
+    if g.dendrogram_row is not None:
+        reordered_idx = g.dendrogram_row.reordered_ind
+        final_ids = [S_scaled.index[i] for i in reordered_idx]
+    else:
+        final_ids = S_scaled.index.tolist()
+
+    # 获取对应顺序的 MP 标签
+    final_labels = mp_res.programs_clusters.reindex(final_ids).tolist()
+
+    # 遍历标签，寻找连续的相同 MP 区块
+    # 结构：(start_index, length, mp_label)
+    blocks = []
+    if final_labels:
+        current_mp = final_labels[0]
+        start_idx = 0
+        count = 0
+        
+        for i, lab in enumerate(final_labels):
+            if lab == current_mp:
+                count += 1
+            else:
+                blocks.append((start_idx, count, current_mp))
+                current_mp = lab
+                start_idx = i
+                count = 1
+        # 添加最后一个
+        blocks.append((start_idx, count, current_mp))
+
+    # 在 ax_heatmap 上画框
+    ax = g.ax_heatmap
+    for start, size, mp in blocks:
+        # 画矩形：(x, y), width, height
+        # heatmap 中坐标系：左上角 (0,0)，x 向右，y 向下
+        # 对角线块的位置是 x=start, y=start
+        rect = mpatches.Rectangle(
+            (start, start), 
+            width=size, 
+            height=size, 
+            fill=False, 
+            edgecolor="black",  # 虚线颜色，可改为 "grey" 或其他
+            linestyle="--", 
+            linewidth=1.5
+        )
+        ax.add_patch(rect)
+
+    # ---------- 8) 图例和 Colorbar ----------
     legend_handles = [
         mpatches.Patch(color=annotation_colors.get(mp, "#808080"), label=mp)
         for mp in MPs
     ]
 
-    # 将图例添加到 Figure 上
-    # bbox_to_anchor 控制位置，loc 控制对齐方式
     g.fig.legend(
         handles=legend_handles,
         title="Metaprogram",
@@ -922,16 +979,14 @@ def plot_meta_programs(
         frameon=False
     )
 
-    # 在右侧添加一个新的 axes 放 colorbar
     try:
-        # 尝试基于刚添加的 legend 的位置在其正下方添加 colorbar axes
         if not g.fig.legends:
             raise RuntimeError("No legend found")
         legend = g.fig.legends[-1]
         renderer = g.fig.canvas.get_renderer()
         bbox = legend.get_window_extent(renderer).transformed(g.fig.transFigure.inverted())
         pad = 0.03
-        height = bbox.height / len(MPs) * 4
+        height = bbox.height / max(len(MPs), 1) * 4
         left = (bbox.x1 - bbox.x0) / 5 + bbox.x0
         width = (bbox.x1 - bbox.x0) / 5
         bottom = bbox.y0 - height - pad
@@ -939,10 +994,9 @@ def plot_meta_programs(
             bottom = 0.01
         cbar_ax = g.fig.add_axes([left, bottom, width, height])
     except Exception:
-        # 回退到固定位置（如果无法计算 legend bbox）
         cbar_ax = g.fig.add_axes([1.02, 0.8, 0.02, 0.15])
+    
     cbar = plt.colorbar(heatmap, cax=cbar_ax)
-    # cbar.outline.set_visible(False)
     cbar.set_label("Similarity", labelpad=5)
 
     return g
