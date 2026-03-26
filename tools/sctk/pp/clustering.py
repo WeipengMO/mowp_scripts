@@ -99,84 +99,57 @@ def leiden_parallel(
         adata.obs[f"leiden_{r}"] = pd.Categorical(labels)
 
 
-def get_shilouette_score(
-        adata: sc.AnnData, 
-        obsm: str = 'X_pca', 
-        cluster_key: str = 'leiden',
-        metric:str = 'euclidean',
-        n_pcs: int = 50,
-        debug: bool = False,
-        show: bool = True,
-    ):
-    '''The function performs clustering using the Leiden algorithm on an AnnData object and calculates the silhouette score for each clustering result.
+def cluster_silhouette_score(
+    adata,
+    cluster_key="leiden",
+    obsm_key="X_scVI",
+    n_dims=None,
+    metric="euclidean",
+    sample_size=10000,
+    random_state=42,
+    show=True,
+):
+    from sklearn.metrics import silhouette_score
 
-    Parameters
-    ----------
-    adata : sc.AnnData
-        Annotated data matrix containing the input data.
+    X = adata.obsm[obsm_key]
 
-    obsm : str, optional
-        The name of the observation matrix in `adata` to be used for clustering. Default is 'X_pca'.
+    if n_dims is not None and X.shape[1] > n_dims:
+        X = X[:, :n_dims]
 
-    cluster_key : str, optional
-        The key in `adata.obs` that specifies the clustering labels. Default is 'leiden'.
-
-    metric : str, optional
-        The distance metric to be used for calculating pairwise distances between observations. Default is 'euclidean'.
-        Other possible values include 'manhattan' for Manhattan distance, 'cosine' for cosine similarity, and many more.
-
-    n_pcs : int, optional
-        The number of principal components to use for clustering. Default is 50.
-
-    debug : bool, optional
-        If True, enables debug logging. Default is False.
-
-    show : bool, optional
-        If True, displays a point plot of silhouette scores. Default is True.
-
-    Returns
-    -------
-    dict
-        A dictionary where the keys are the resolution values from the input list `ls_res` and the values are the corresponding silhouette scores calculated using the Leiden clustering algorithm.
-    '''
-
-    from sklearn.metrics import pairwise_distances, silhouette_score
-
-    if debug:
-        configure_logger(log_level="debug")
-    else:
-        configure_logger(log_level="info")
-
-    _ad = adata
-    cluster_key = cluster_key + '_'
-
-    logger.debug(f"{obsm=}")
-    if isinstance(obsm, str):
-        obsm = _ad.obsm[obsm]
-    logger.debug(f"{n_pcs=}")
-    if obsm.shape[1] > n_pcs:
-        obsm = obsm[:, :n_pcs]
-
-    ar_dist = pairwise_distances(obsm, metric=metric)
-    dt_score = {}
-    obs_key = list(_ad.obs.filter(like=cluster_key).columns)
+    prefix = f"{cluster_key}_"
+    obs_keys = [c for c in adata.obs.columns if c.startswith(prefix)]
 
     dt_score = {}
-    obs_key = list(adata.obs.filter(like=cluster_key).columns)
-    logger.debug(f"{obs_key=}")
 
-    for _obs_key in obs_key:
-        ls_label =  adata.obs[_obs_key]
-        res = float(_obs_key.replace(cluster_key, ''))
-        if len(set(ls_label)) == 1:
-            dt_score[res] = 0
-        else:
-            dt_score[res] = silhouette_score(ar_dist, adata.obs[_obs_key], metric='precomputed')
+    sample_size = sample_size if (sample_size and adata.n_obs > sample_size) else None
 
+    for key in obs_keys:
+        labels = adata.obs[key].astype(str)
+
+        try:
+            res = float(key.replace(prefix, ""))
+        except ValueError:
+            continue
+
+        n_clusters = labels.nunique()
+        if n_clusters <= 1 or n_clusters >= len(labels):
+            dt_score[res] = np.nan
+            continue
+
+        score = silhouette_score(
+            X,
+            labels,
+            metric=metric,
+            sample_size=sample_size,
+            random_state=random_state,
+        )
+        dt_score[res] = score
+    
     if show:
+        plt.figure(figsize=(4, 4))
         sns.pointplot(x=dt_score.keys(), y=dt_score.values())
         plt.xlabel('resolution')
-        plt.ylabel('shilouette score')
+        plt.ylabel('silhouette score')
         plt.show()
 
     return dt_score

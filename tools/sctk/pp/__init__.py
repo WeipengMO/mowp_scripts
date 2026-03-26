@@ -5,7 +5,7 @@ from .qc import is_outlier
 from .clustering import (
     leiden_iter, 
     leiden_parallel,
-    get_shilouette_score
+    cluster_silhouette_score
 )
 from .adata_process import (
     scanpy_pp, layer_pp, split_adata, get_adata_color, set_adata_color, set_paired_color)
