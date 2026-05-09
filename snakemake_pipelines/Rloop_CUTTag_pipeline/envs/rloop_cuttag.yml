@@ -1,0 +1,21 @@
+name: rloop_cuttag
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python>=3.9
+  - pandas
+  - pyyaml
+  - snakemake
+  - fastp
+  - bowtie2
+  - samtools
+  - bedtools
+  - macs2
+  - deeptools
+  - multiqc
+  - openjdk
+  - r-base
+  - bioconductor-deseq2
+  - r-optparse
