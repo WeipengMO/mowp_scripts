@@ -1,0 +1,118 @@
+import os
+import pandas as pd
+import yaml
+
+configfile:
+    "config.yml"
+
+workdir:
+    config["workdir"]
+
+SAMPLE_TABLE = config["sample_table"]
+samples_df = pd.read_csv(SAMPLE_TABLE, sep="\t").fillna("")
+
+required_cols = [
+    "sample", "fq1", "fq2", "condition", "assay",
+    "replicate", "background", "rnaseh_pair", "call_peak"
+]
+missing = [c for c in required_cols if c not in samples_df.columns]
+if missing:
+    raise ValueError(f"sample_table.tsv missing columns: {missing}")
+
+samples_df["sample"] = samples_df["sample"].astype(str)
+SAMPLES = samples_df["sample"].tolist()
+SAMPLE_DF = samples_df.set_index("sample", drop=False)
+
+PEAK_SAMPLES = samples_df.loc[
+    samples_df["call_peak"].astype(str).str.lower().isin(["yes", "true", "1"]),
+    "sample"
+].tolist()
+
+BG_SAMPLES = [
+    s for s in PEAK_SAMPLES
+    if str(SAMPLE_DF.loc[s, "background"]).strip() != ""
+]
+
+RNASEH_SAMPLES = [
+    s for s in PEAK_SAMPLES
+    if str(SAMPLE_DF.loc[s, "rnaseh_pair"]).strip() != ""
+]
+
+HIGHCONF_SAMPLES = [
+    s for s in PEAK_SAMPLES
+    if str(SAMPLE_DF.loc[s, "background"]).strip() != ""
+    and str(SAMPLE_DF.loc[s, "rnaseh_pair"]).strip() != ""
+]
+
+def fq1_of(wildcards):
+    return SAMPLE_DF.loc[wildcards.sample, "fq1"]
+
+def fq2_of(wildcards):
+    return SAMPLE_DF.loc[wildcards.sample, "fq2"]
+
+def bg_sample_of(wildcards):
+    bg = str(SAMPLE_DF.loc[wildcards.sample, "background"]).strip()
+    if not bg:
+        raise ValueError(f"{wildcards.sample} has no background sample in sample_table.tsv")
+    return bg
+
+def rnaseh_sample_of(wildcards):
+    rh = str(SAMPLE_DF.loc[wildcards.sample, "rnaseh_pair"]).strip()
+    if not rh:
+        raise ValueError(f"{wildcards.sample} has no rnaseh_pair sample in sample_table.tsv")
+    return rh
+
+def bg_bam_of(wildcards):
+    return f"aligned_data/{bg_sample_of(wildcards)}.final.bam"
+
+def rnaseh_bam_of(wildcards):
+    return f"aligned_data/{rnaseh_sample_of(wildcards)}.final.bam"
+
+replicate_data = {}
+replicate_table = config.get("replicate_table", "")
+if replicate_table and os.path.exists(replicate_table):
+    with open(replicate_table, "r") as f:
+        replicate_data = yaml.safe_load(f) or {}
+
+REPLICATE_GROUPS = list(replicate_data.keys())
+
+rule all:
+    input:
+        expand("aligned_data/{sample}.final.bam", sample=SAMPLES),
+        expand("aligned_data/{sample}.final.bam.bai", sample=SAMPLES),
+        expand("bw_files/{sample}.CPM.bw", sample=SAMPLES),
+        expand("qc/{sample}.flagstat.txt", sample=SAMPLES),
+        expand("macs2/nocontrol/{sample}/{sample}_peaks.narrowPeak", sample=PEAK_SAMPLES),
+        expand("macs2/vs_background/{sample}/{sample}_peaks.narrowPeak", sample=BG_SAMPLES),
+        expand("macs2/rnaseh_sensitive/{sample}/{sample}_peaks.narrowPeak", sample=RNASEH_SAMPLES),
+        expand("high_confidence_peaks/{sample}.highconf.bed", sample=HIGHCONF_SAMPLES),
+        expand("high_confidence_peaks/{sample}.highconf.metrics.tsv", sample=HIGHCONF_SAMPLES),
+        expand("consensus_peaks/{group}.reproducible.bed", group=REPLICATE_GROUPS),
+        "consensus_peaks/Rloop_highconf_universe.bed",
+        "counts/Rloop_highconf_universe_counts.tsv",
+        "multiqc/multiqc_report.html"
+
+if config["mode"] == "pe":
+    include:
+        "snakemake/rloop_cuttag_pe.smk"
+else:
+    include:
+        "snakemake/rloop_cuttag_se.smk"
+
+include:
+    "snakemake/rloop_callpeak.smk"
+
+rule multiqc:
+    input:
+        expand("logs/{sample}.fastp.log", sample=SAMPLES),
+        expand("qc/{sample}.flagstat.txt", sample=SAMPLES)
+    output:
+        "multiqc/multiqc_report.html"
+    threads: 2
+    conda:
+        "envs/rloop_cuttag.yml"
+    shell:
+        """
+        mkdir -p multiqc
+        multiqc . -o multiqc &> logs/multiqc.log
+        """
