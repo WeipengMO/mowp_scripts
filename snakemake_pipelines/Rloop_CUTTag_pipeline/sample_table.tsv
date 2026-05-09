@@ -1,0 +1,13 @@
+sample	fq1	fq2	condition	assay	replicate	background	rnaseh_pair	call_peak
+Ctrl_S96_rep1	raw_data/Ctrl_S96_rep1_R1.fq.gz	raw_data/Ctrl_S96_rep1_R2.fq.gz	Ctrl	S9.6	1	Ctrl_IgG_rep1	Ctrl_S96_RNaseH_rep1	yes
+Ctrl_S96_RNaseH_rep1	raw_data/Ctrl_S96_RNaseH_rep1_R1.fq.gz	raw_data/Ctrl_S96_RNaseH_rep1_R2.fq.gz	Ctrl	RNaseH	1	Ctrl_IgG_rep1		no
+Ctrl_IgG_rep1	raw_data/Ctrl_IgG_rep1_R1.fq.gz	raw_data/Ctrl_IgG_rep1_R2.fq.gz	Ctrl	IgG	1			no
+Ctrl_S96_rep2	raw_data/Ctrl_S96_rep2_R1.fq.gz	raw_data/Ctrl_S96_rep2_R2.fq.gz	Ctrl	S9.6	2	Ctrl_IgG_rep2	Ctrl_S96_RNaseH_rep2	yes
+Ctrl_S96_RNaseH_rep2	raw_data/Ctrl_S96_RNaseH_rep2_R1.fq.gz	raw_data/Ctrl_S96_RNaseH_rep2_R2.fq.gz	Ctrl	RNaseH	2	Ctrl_IgG_rep2		no
+Ctrl_IgG_rep2	raw_data/Ctrl_IgG_rep2_R1.fq.gz	raw_data/Ctrl_IgG_rep2_R2.fq.gz	Ctrl	IgG	2			no
+Treat_S96_rep1	raw_data/Treat_S96_rep1_R1.fq.gz	raw_data/Treat_S96_rep1_R2.fq.gz	Treat	S9.6	1	Treat_IgG_rep1	Treat_S96_RNaseH_rep1	yes
+Treat_S96_RNaseH_rep1	raw_data/Treat_S96_RNaseH_rep1_R1.fq.gz	raw_data/Treat_S96_RNaseH_rep1_R2.fq.gz	Treat	RNaseH	1	Treat_IgG_rep1		no
+Treat_IgG_rep1	raw_data/Treat_IgG_rep1_R1.fq.gz	raw_data/Treat_IgG_rep1_R2.fq.gz	Treat	IgG	1			no
+Treat_S96_rep2	raw_data/Treat_S96_rep2_R1.fq.gz	raw_data/Treat_S96_rep2_R2.fq.gz	Treat	S9.6	2	Treat_IgG_rep2	Treat_S96_RNaseH_rep2	yes
+Treat_S96_RNaseH_rep2	raw_data/Treat_S96_RNaseH_rep2_R1.fq.gz	raw_data/Treat_S96_RNaseH_rep2_R2.fq.gz	Treat	RNaseH	2	Treat_IgG_rep2		no
+Treat_IgG_rep2	raw_data/Treat_IgG_rep2_R1.fq.gz	raw_data/Treat_IgG_rep2_R2.fq.gz	Treat	IgG	2			no
