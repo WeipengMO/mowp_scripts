@@ -1,0 +1,56 @@
+# snakemake
+mode: pe
+workdir: .
+sample_table: sample_table.tsv
+replicate_table: replicate.yml
+
+# genome
+# bowtie2 index prefix, not fasta file. Example: /data/user/mowp/db/hg38/dna/bowtie2_index/genome
+genome_index: /data/user/mowp/db/hg38/dna/bowtie2_index/genome
+gsize: hs
+chrom_sizes: /data/user/mowp/db/hg38/hg38.chrom.sizes
+blacklist: /data/user/mowp/db/hg38/bed/hg38.blacklist.bed
+regions_bed: /data/user/mowp/db/hg38/bed/genes.bed
+
+# software
+picard_path: /data/software/picard.jar
+
+# alignment/filter
+bowtie2_extra: "--very-sensitive --dovetail -X 1000"
+bowtie2_extra_se: "--very-sensitive"
+mapq: 30
+remove_duplicates: true
+bin_size: 10
+
+# MACS2 settings
+macs2:
+  qvalue: 0.01
+  # For paired-end CUT&Tag, BAMPE is recommended.
+  format_pe: BAMPE
+  # Keep all duplicates here because duplicate removal is controlled above.
+  extra: "--keep-dup all"
+
+# high-confidence R-loop peak filter
+# high-confidence = candidate S9.6/HBD peak + signal > background + signal decreases after RNase H
+filter:
+  min_log2fc_vs_background: 1.0
+  min_log2fc_vs_rnaseh: 1.0
+  min_signal_cpm: 0.0
+  pseudocount: 1.0
+
+# consensus across biological replicates
+min_reps_for_consensus: 2
+
+# optional spike-in; currently the main pipeline produces CPM tracks.
+# If your experiment has E. coli/Drosophila spike-in and global R-loop changes are expected,
+# use spike-in scale factors for final quantitative comparison.
+spikein:
+  enable: false
+  index: /data/user/mowp/db/ecoli/bowtie2_index/ecoli
+  reference_sample: ""
+
+threads:
+  fastp: 8
+  bowtie2: 16
+  samtools: 8
+  deeptools: 12
