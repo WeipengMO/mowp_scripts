@@ -16,7 +16,7 @@ option_list <- list(
 opt <- parse_args(OptionParser(option_list=option_list))
 
 counts <- read.table(opt$counts, sep="\t", header=TRUE, check.names=FALSE)
-meta <- read.table(opt$sample.table, sep="\t", header=TRUE, check.names=FALSE, stringsAsFactors=FALSE)
+meta <- read.table(opt$sample_table, sep="\t", header=TRUE, check.names=FALSE, stringsAsFactors=FALSE)
 
 peak_id <- paste(counts$chr, counts$start, counts$end, sep=":")
 count_mat <- counts[, !(colnames(counts) %in% c("chr", "start", "end")), drop=FALSE]
@@ -34,7 +34,7 @@ dds <- DESeqDataSetFromMatrix(
   design=~ condition
 )
 dds <- DESeq(dds)
-res <- results(dds, contrast=c("condition", opt$condition.a, opt$condition.b))
+res <- results(dds, contrast=c("condition", opt$condition_a, opt$condition_b))
 res_df <- as.data.frame(res)
 res_df$peak_id <- rownames(res_df)
 res_df$chr <- sub(":.*", "", res_df$peak_id)
@@ -42,7 +42,7 @@ res_df$start <- as.integer(sub(".*:(.*):.*", "\\1", res_df$peak_id))
 res_df$end <- as.integer(sub(".*:", "", res_df$peak_id))
 res_df <- res_df[, c("chr", "start", "end", "peak_id", "baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")]
 
-write.table(res_df, paste0(opt$out.prefix, ".tsv"), sep="\t", row.names=FALSE, quote=FALSE)
+write.table(res_df, paste0(opt$out_prefix, ".tsv"), sep="\t", row.names=FALSE, quote=FALSE)
 
 sig <- subset(res_df, !is.na(padj) & padj < 0.05 & abs(log2FoldChange) > 1)
-write.table(sig, paste0(opt$out.prefix, ".padj0.05_lfc1.tsv"), sep="\t", row.names=FALSE, quote=FALSE)
+write.table(sig, paste0(opt$out_prefix, ".padj0.05_lfc1.tsv"), sep="\t", row.names=FALSE, quote=FALSE)
