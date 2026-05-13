@@ -1,3 +1,4 @@
+import textwrap
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -242,6 +243,7 @@ def plot_gsea_bar(
         title: str = '',
         bar_color: str = 'lightblue',
         term_key: str = 'Term',
+        text_width: int = 50,
     ):
     
     enr = enr[enr[pvalue_key] < pvalue_threshold].copy()
@@ -269,8 +271,9 @@ def plot_gsea_bar(
     ax = plt.gca()
     for text, nes in zip(ax.get_yticklabels(), top_results['NES']):
         ha = 'left' if nes > 0 else 'right'
-        plt.text(
-            text.get_position()[0], text.get_position()[1], text.get_text(), 
+        wrapped_text = textwrap.fill(text.get_text(), width=text_width, break_long_words=False)
+        ax.text(
+            text.get_position()[0], text.get_position()[1], wrapped_text, 
             fontsize=fontsize, ha=ha, va='center')
     ax.set_yticks([])
     ax.set_ylabel('')
