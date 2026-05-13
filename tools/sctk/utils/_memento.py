@@ -1,11 +1,15 @@
 import scanpy as sc
-import memento
 from tqdm.auto import tqdm
 from loguru import logger
 import pandas as pd
 import numpy as np
 import decoupler as dc
 from typing import List, Union
+
+try:
+    import memento
+except ImportError:
+    logger.warning("memento package is not installed.")
 
 
 def run_memento(
@@ -99,7 +103,9 @@ def run_gsea(
         source: str = 'geneset', 
         target: str = 'genesymbol', 
         enrich_dict: dict = None, 
-        pvalue_threshold: str = None):
+        pvalue_threshold: str = None,
+        set_index: str = 'gene',
+    ):
 
     return_results = False
     if enrich_dict is None:
@@ -108,7 +114,10 @@ def run_gsea(
 
 
     for res in results_dict:
-        de = results_dict[res].set_index('gene')
+        if set_index is not None:
+            de = results_dict[res].set_index(set_index)
+        else:
+            de = results_dict[res]
 
         if pvalue_threshold is not None:
             de.query(pvalue_threshold, inplace=True)
@@ -131,17 +140,17 @@ def run_gsea(
         return enrich_dict
     
 
-def filter_gsea_res(enrich_dict, pvalue_key='FDR p-value', pvalue_threshold=0.05, n_top=10):
+def filter_gsea_res(enrich_dict, pvalue_key='FDR p-value', pvalue_threshold=0.05):
     concat_list = []
     term_list = []
     for res in enrich_dict:
         mask = enrich_dict[res][pvalue_key] < pvalue_threshold
         gsea_df = enrich_dict[res][mask].copy()
 
-        term = list(gsea_df.query('change == "up"').sort_values(['NES'], ascending=False).head(n_top)['Term'])
+        term = list(gsea_df.query('change == "up"').sort_values(['NES'], ascending=False)['Term'])
         term_list.extend(term)
 
-        term = list(gsea_df.query('change == "down"').sort_values(['NES'], ascending=True).head(n_top)['Term'])
+        term = list(gsea_df.query('change == "down"').sort_values(['NES'], ascending=True)['Term'])
         term_list.extend(term)
 
         concat_list.append(gsea_df)
